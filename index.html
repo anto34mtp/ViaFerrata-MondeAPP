@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Politique de confidentialité — ViaFerrata-Monde</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      line-height: 1.7;
+    }
+
+    header {
+      background: linear-gradient(135deg, #0f172a 0%, #064e3b 100%);
+      color: #fff;
+      padding: 48px 24px 40px;
+      text-align: center;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .logo-icon {
+      width: 48px;
+      height: 48px;
+      background: #10b981;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .logo-name {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    header p {
+      color: rgba(255,255,255,0.7);
+      font-size: 14px;
+    }
+
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    .updated {
+      display: inline-block;
+      background: #dcfce7;
+      color: #166534;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 32px;
+    }
+
+    .intro {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 32px;
+      font-size: 15px;
+      color: #475569;
+    }
+
+    section {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+
+    section h2 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    section h2 .icon {
+      width: 32px;
+      height: 32px;
+      background: #ecfdf5;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    p { color: #475569; font-size: 15px; margin-bottom: 12px; }
+    p:last-child { margin-bottom: 0; }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    ul li {
+      color: #475569;
+      font-size: 15px;
+      padding: 6px 0 6px 20px;
+      position: relative;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    ul li:last-child { border-bottom: none; }
+
+    ul li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: #10b981;
+      font-weight: 700;
+    }
+
+    .highlight {
+      background: #ecfdf5;
+      border-left: 3px solid #10b981;
+      border-radius: 0 8px 8px 0;
+      padding: 14px 16px;
+      margin-top: 16px;
+      font-size: 14px;
+      color: #065f46;
+      font-weight: 500;
+    }
+
+    .badge-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .badge {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 14px;
+      color: #334155;
+    }
+
+    .badge strong {
+      display: block;
+      color: #0f172a;
+      font-size: 13px;
+      margin-bottom: 2px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      margin-top: 4px;
+    }
+
+    th {
+      background: #f1f5f9;
+      padding: 10px 12px;
+      text-align: left;
+      font-weight: 600;
+      color: #475569;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #475569;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .no { color: #ef4444; font-weight: 600; }
+    .yes { color: #10b981; font-weight: 600; }
+
+    footer {
+      text-align: center;
+      padding: 32px 24px;
+      color: #94a3b8;
+      font-size: 13px;
+    }
+
+    footer a { color: #10b981; text-decoration: none; }
+
+    @media (max-width: 500px) {
+      .badge-grid { grid-template-columns: 1fr; }
+      header h1 { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⛰️</div>
+    <span class="logo-name">ViaFerrata-Monde</span>
+  </div>
+  <h1>Politique de confidentialité</h1>
+  <p>Application mobile Android</p>
+</header>
+
+<main>
+  <span class="updated">Dernière mise à jour : mai 2025</span>
+
+  <div class="intro">
+    Cette politique de confidentialité décrit comment l'application <strong>ViaFerrata-Monde</strong>
+    collecte, utilise et protège vos données personnelles lorsque vous utilisez notre application Android.
+    Nous nous engageons à respecter votre vie privée et à traiter vos données conformément au
+    <strong>Règlement Général sur la Protection des Données (RGPD)</strong>.
+  </div>
+
+  <!-- 1. Qui sommes-nous -->
+  <section>
+    <h2><span class="icon">🏢</span> 1. Responsable du traitement</h2>
+    <p>L'application ViaFerrata-Monde est éditée par :</p>
+    <div class="badge-grid">
+      <div class="badge"><strong>Application</strong>ViaFerrata-Monde</div>
+      <div class="badge"><strong>Site web</strong>viaferrata-monde.fr</div>
+      <div class="badge"><strong>Contact</strong>contact@viaferrata-monde.fr</div>
+      <div class="badge"><strong>Pays</strong>France 🇫🇷</div>
+    </div>
+  </section>
+
+  <!-- 2. Données collectées -->
+  <section>
+    <h2><span class="icon">📋</span> 2. Données collectées</h2>
+
+    <p><strong>Données de compte (si vous créez un compte) :</strong></p>
+    <ul>
+      <li>Adresse e-mail</li>
+      <li>Nom d'utilisateur choisi par vous</li>
+      <li>Mot de passe (stocké chiffré, jamais accessible en clair)</li>
+    </ul>
+
+    <p style="margin-top:16px"><strong>Données de localisation (avec votre accord) :</strong></p>
+    <ul>
+      <li>Position GPS pour afficher votre emplacement sur la carte des vias</li>
+      <li>Localisation approximative pour les fonctions de recherche à proximité</li>
+    </ul>
+
+    <p style="margin-top:16px"><strong>Données d'utilisation :</strong></p>
+    <ul>
+      <li>Road trips créés, vias ferrata ajoutées aux trips</li>
+      <li>Favoris et carnet de sorties</li>
+      <li>Préférences de l'application</li>
+    </ul>
+
+    <div class="highlight">
+      ✅ Nous ne collectons pas de données financières, biométriques, médicales ou sensibles.
+      L'application ne cible pas les enfants de moins de 13 ans.
+    </div>
+  </section>
+
+  <!-- 3. Pourquoi -->
+  <section>
+    <h2><span class="icon">🎯</span> 3. Finalités du traitement</h2>
+    <table>
+      <tr>
+        <th>Donnée</th>
+        <th>Utilisation</th>
+        <th>Base légale</th>
+      </tr>
+      <tr>
+        <td>E-mail / mot de passe</td>
+        <td>Authentification à votre compte</td>
+        <td>Exécution du contrat</td>
+      </tr>
+      <tr>
+        <td>Localisation GPS</td>
+        <td>Affichage sur la carte, calcul d'itinéraire</td>
+        <td>Consentement</td>
+      </tr>
+      <tr>
+        <td>Road trips, favoris</td>
+        <td>Fonctionnement des fonctionnalités de l'app</td>
+        <td>Exécution du contrat</td>
+      </tr>
+      <tr>
+        <td>Données de partage</td>
+        <td>Partage de trips avec d'autres utilisateurs</td>
+        <td>Consentement</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- 4. Partage -->
+  <section>
+    <h2><span class="icon">🔗</span> 4. Partage des données</h2>
+    <p>Nous <strong>ne vendons jamais</strong> vos données à des tiers. Les données sont partagées uniquement dans les cas suivants :</p>
+    <ul>
+      <li>Avec les utilisateurs avec qui vous choisissez de partager un road trip (uniquement votre nom d'utilisateur)</li>
+      <li>Avec notre serveur d'API (viaferrata-monde.fr) pour le fonctionnement de l'application</li>
+      <li>Si requis par la loi ou une autorité judiciaire compétente</li>
+    </ul>
+
+    <p style="margin-top:16px"><strong>Services tiers utilisés :</strong></p>
+    <div class="badge-grid">
+      <div class="badge"><strong>Google Maps</strong>Affichage carte &amp; itinéraires (données transmises selon les CGU Google)</div>
+      <div class="badge"><strong>API ViaFerrata-Monde</strong>Stockage sécurisé de vos données sur nos serveurs (hébergés en France)</div>
+    </div>
+  </section>
+
+  <!-- 5. Localisation -->
+  <section>
+    <h2><span class="icon">📍</span> 5. Localisation GPS</h2>
+    <p>
+      L'application demande l'accès à votre localisation <strong>uniquement en avant-plan</strong>
+      (lorsque l'application est ouverte). Elle n'accède jamais à votre position en arrière-plan.
+    </p>
+    <ul>
+      <li>Vous pouvez refuser l'accès à la localisation — l'app reste fonctionnelle sans cette permission</li>
+      <li>Vous pouvez révoquer l'accès à tout moment dans Paramètres → Applications → ViaFerrata-Monde → Autorisations</li>
+      <li>La localisation n'est jamais enregistrée sur nos serveurs sans votre action explicite</li>
+    </ul>
+  </section>
+
+  <!-- 6. Conservation -->
+  <section>
+    <h2><span class="icon">🗓️</span> 6. Durée de conservation</h2>
+    <table>
+      <tr>
+        <th>Données</th>
+        <th>Durée de conservation</th>
+      </tr>
+      <tr>
+        <td>Données de compte</td>
+        <td>Jusqu'à suppression du compte par l'utilisateur</td>
+      </tr>
+      <tr>
+        <td>Road trips, favoris, carnet</td>
+        <td>Jusqu'à suppression par l'utilisateur ou du compte</td>
+      </tr>
+      <tr>
+        <td>Données de connexion</td>
+        <td>12 mois maximum (logs serveur)</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- 7. Vos droits -->
+  <section>
+    <h2><span class="icon">⚖️</span> 7. Vos droits (RGPD)</h2>
+    <p>Conformément au RGPD, vous disposez des droits suivants sur vos données :</p>
+    <ul>
+      <li><strong>Droit d'accès</strong> — obtenir une copie de vos données</li>
+      <li><strong>Droit de rectification</strong> — corriger des données inexactes</li>
+      <li><strong>Droit à l'effacement</strong> — supprimer votre compte et toutes vos données</li>
+      <li><strong>Droit à la portabilité</strong> — recevoir vos données dans un format lisible</li>
+      <li><strong>Droit d'opposition</strong> — vous opposer à certains traitements</li>
+    </ul>
+    <div class="highlight">
+      Pour exercer vos droits, contactez-nous à : <strong>contact@viaferrata-monde.fr</strong><br>
+      Nous répondons dans un délai maximum de 30 jours.
+    </div>
+  </section>
+
+  <!-- 8. Sécurité -->
+  <section>
+    <h2><span class="icon">🔒</span> 8. Sécurité</h2>
+    <ul>
+      <li>Toutes les communications entre l'app et notre serveur sont chiffrées via <strong>HTTPS / TLS</strong></li>
+      <li>Les mots de passe sont stockés hachés (bcrypt) — jamais en clair</li>
+      <li>Les tokens d'authentification sont stockés de manière sécurisée sur l'appareil</li>
+      <li>Aucune donnée de carte bancaire n'est collectée ou stockée</li>
+    </ul>
+  </section>
+
+  <!-- 9. Enfants -->
+  <section>
+    <h2><span class="icon">👶</span> 9. Enfants</h2>
+    <p>
+      ViaFerrata-Monde est destinée aux utilisateurs âgés de <strong>13 ans et plus</strong>.
+      Nous ne collectons pas sciemment de données personnelles concernant des enfants de moins de 13 ans.
+      Si vous pensez qu'un enfant de moins de 13 ans a créé un compte, contactez-nous pour que nous
+      supprimions ces données.
+    </p>
+  </section>
+
+  <!-- 10. Modifications -->
+  <section>
+    <h2><span class="icon">📝</span> 10. Modifications de cette politique</h2>
+    <p>
+      Nous pouvons mettre à jour cette politique de confidentialité. En cas de modification substantielle,
+      vous serez informé via une notification dans l'application ou par e-mail.
+      La date de dernière mise à jour est indiquée en haut de cette page.
+    </p>
+  </section>
+
+  <!-- 11. Contact -->
+  <section>
+    <h2><span class="icon">✉️</span> 11. Contact &amp; réclamations</h2>
+    <p>Pour toute question relative à cette politique ou à vos données :</p>
+    <div class="badge-grid">
+      <div class="badge"><strong>E-mail</strong>contact@viaferrata-monde.fr</div>
+      <div class="badge"><strong>Site web</strong>viaferrata-monde.fr</div>
+    </div>
+    <p style="margin-top:16px">
+      Vous avez également le droit de déposer une réclamation auprès de la
+      <strong>CNIL</strong> (Commission Nationale de l'Informatique et des Libertés) :
+      <a href="https://www.cnil.fr" target="_blank">www.cnil.fr</a>
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  <p>© 2025 ViaFerrata-Monde · <a href="https://viaferrata-monde.fr">viaferrata-monde.fr</a></p>
+  <p style="margin-top:4px">Politique de confidentialité — Application Android</p>
+</footer>
+
+</body>
+</html>
