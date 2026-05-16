@@ -1,6 +1,9 @@
 # Build output
 build_output/
 
+# Keystore (sensitive — place manually before building)
+keystore/
+
 # Node modules
 ViaFerrataApp/node_modules/
 
