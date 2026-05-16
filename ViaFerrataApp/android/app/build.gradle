@@ -47,11 +47,9 @@ def ksKeyPassword   = project.hasProperty('KEYSTORE_KEY_PASSWORD')   ? project.K
 
 android {
     ndkVersion rootProject.ext.ndkVersion
-    buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.viaferrataapp"
-    compileSdk rootProject.ext.compileSdkVersion
 
     defaultConfig {
         applicationId "com.viaferrataapp"
