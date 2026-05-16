@@ -9,17 +9,27 @@ type Lang = 'fr' | 'en' | 'de' | 'es';
 
 type Translations = typeof fr;
 
+// resolve('nav.home', translations) → 'Accueil'
+function resolve(path: string, obj: any): string {
+  return path.split('.').reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : path), obj);
+}
+
 interface LangContextType {
   lang: Lang;
-  t: Translations;
+  t: ((key: string) => string) & Translations;
   setLang: (lang: Lang) => void;
 }
 
 const translations: Record<Lang, Translations> = {fr, en, de, es};
 
+function makeT(dict: Translations): ((key: string) => string) & Translations {
+  const fn = (key: string) => resolve(key, dict);
+  return Object.assign(fn, dict) as any;
+}
+
 const LangContext = createContext<LangContextType>({
   lang: 'fr',
-  t: fr,
+  t: makeT(fr),
   setLang: () => {},
 });
 
@@ -43,7 +53,7 @@ export const LangProvider: React.FC<{children: React.ReactNode}> = ({
 
   return (
     <LangContext.Provider
-      value={{lang, t: translations[lang], setLang}}>
+      value={{lang, t: makeT(translations[lang]), setLang}}>
       {children}
     </LangContext.Provider>
   );

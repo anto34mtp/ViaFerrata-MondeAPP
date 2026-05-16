@@ -1,5 +1,4 @@
 export default {
-  // Common
   common: {
     loading: 'Chargement...',
     error: 'Erreur',
@@ -28,22 +27,24 @@ export default {
     m: 'm',
     h: 'h',
     min: 'min',
+    notFound: 'Non trouvé',
+    remove: 'Retirer',
   },
 
-  // Navigation
   nav: {
     home: 'Accueil',
     catalog: 'Catalogue',
     map: 'Carte',
-    dashboard: 'Tableau de bord',
+    dashboard: 'Mon espace',
     favorites: 'Favoris',
     logbook: 'Carnet',
     trips: 'Road Trips',
     settings: 'Paramètres',
     auth: 'Connexion',
+    login: 'Connexion',
+    more: 'Plus',
   },
 
-  // Home Screen
   home: {
     title: 'Via Ferrata Monde',
     subtitle: 'Découvrez les plus belles vias ferrata du monde',
@@ -55,7 +56,6 @@ export default {
     welcome: 'Bienvenue !',
   },
 
-  // Catalog Screen
   catalog: {
     title: 'Catalogue',
     searchPlaceholder: 'Rechercher une via...',
@@ -77,7 +77,6 @@ export default {
     noVias: 'Aucune via trouvée',
   },
 
-  // Via Detail Screen
   viaDetail: {
     difficulty: 'Difficulté',
     duration: 'Durée',
@@ -113,7 +112,6 @@ export default {
     },
   },
 
-  // Map Screen
   map: {
     title: 'Carte mondiale',
     loading: 'Chargement de la carte...',
@@ -121,44 +119,46 @@ export default {
     viewVia: 'Voir la via',
   },
 
-  // Auth Screens
   auth: {
     loginTitle: 'Connexion',
     registerTitle: 'Créer un compte',
     email: 'Email',
-    username: 'Nom d\'utilisateur',
+    username: "Nom d'utilisateur",
     password: 'Mot de passe',
     loginButton: 'Se connecter',
-    registerButton: 'S\'inscrire',
+    registerButton: "S'inscrire",
     noAccount: 'Pas encore de compte ?',
     alreadyAccount: 'Déjà un compte ?',
-    registerLink: 'S\'inscrire',
+    registerLink: "S'inscrire",
     loginLink: 'Se connecter',
     loginError: 'Identifiants incorrects',
-    registerError: 'Erreur lors de l\'inscription',
+    registerError: "Erreur lors de l'inscription",
     loginPlaceholder: 'Email ou nom d\'utilisateur',
     passwordPlaceholder: 'Mot de passe',
-    usernamePlaceholder: 'Nom d\'utilisateur',
+    usernamePlaceholder: "Nom d'utilisateur",
     emailPlaceholder: 'Email',
+    login: 'Se connecter',
+    register: "S'inscrire",
+    logout: 'Se déconnecter',
+    confirmLogout: 'Voulez-vous vous déconnecter ?',
+    loginRequired: 'Connectez-vous pour accéder à cette section',
   },
 
-  // Dashboard Screen
   dashboard: {
-    title: 'Tableau de bord',
+    title: 'Mon espace',
     hello: 'Bonjour',
     stats: 'Mes statistiques',
     totalFavorites: 'Favoris',
-    totalLogbook: 'Carnet',
+    totalLogbook: 'Sorties',
     totalTrips: 'Road Trips',
     recentFavorites: 'Favoris récents',
-    recentLogbook: 'Carnet récent',
+    recentLogbook: 'Dernières sorties',
     myTrips: 'Mes voyages',
     noFavorites: 'Aucun favori',
-    noLogbook: 'Aucune entrée',
+    noLogbook: 'Aucune sortie',
     noTrips: 'Aucun voyage',
   },
 
-  // Favorites Screen
   favorites: {
     title: 'Mes favoris',
     all: 'Tous',
@@ -175,16 +175,21 @@ export default {
     },
   },
 
-  // Logbook Screen
   logbook: {
     title: 'Mon carnet',
-    addEntry: 'Ajouter une entrée',
+    add: 'Ajouter',
+    addEntry: 'Ajouter une sortie',
+    date: 'Date (AAAA-MM-JJ)',
     doneDate: 'Date de réalisation',
-    conditions: 'Conditions',
+    conditions: 'Conditions météo',
     companion: 'Compagnon(s)',
     notes: 'Notes',
-    deleteEntry: 'Supprimer l\'entrée',
+    viaId: 'ID de la via',
+    delete: 'Supprimer',
+    confirmDelete: 'Supprimer cette sortie ?',
+    empty: 'Aucune sortie dans le carnet',
     noEntries: 'Aucune entrée dans le carnet',
+    requiredFields: 'ID via et date sont requis',
     conditionsPlaceholder: 'Bonnes conditions, sec...',
     companionPlaceholder: 'Avec qui ?',
     notesPlaceholder: 'Vos notes...',
@@ -192,63 +197,60 @@ export default {
     selectDate: 'Sélectionner une date',
   },
 
-  // Road Trips Screen
   trips: {
     title: 'Road Trips',
     myTrips: 'Mes voyages',
     sharedTrips: 'Voyages partagés',
+    create: 'Créer un voyage',
     createTrip: 'Créer un voyage',
+    newTrip: 'Nouveau voyage',
+    name: 'Nom du voyage',
     tripName: 'Nom du voyage',
     description: 'Description',
     startDate: 'Date de début',
     endDate: 'Date de fin',
     nbDays: 'Nombre de jours',
     noTrips: 'Aucun voyage',
+    empty: 'Aucun road trip',
     noSharedTrips: 'Aucun voyage partagé',
+    delete: 'Supprimer',
     deleteTrip: 'Supprimer le voyage',
+    confirmDelete: 'Supprimer le voyage',
     viewDetails: 'Voir les détails',
-  },
-
-  // Road Trip Detail Screen
-  tripDetail: {
-    title: 'Détails du voyage',
-    day: 'Jour',
+    nameRequired: 'Le nom est requis',
+    createError: 'Erreur lors de la création',
+    loadError: 'Impossible de charger le voyage',
     addVia: 'Ajouter une via',
-    removeVia: 'Retirer la via',
-    noVias: 'Aucune via pour ce jour',
-    mapView: 'Vue carte',
-    listView: 'Vue liste',
-    notes: 'Notes',
-    viaCount: 'vias',
+    removeVia: 'Retirer une via',
+    noVias: 'Aucune via — ajoutez-en avec le bouton +',
   },
 
-  // Submit Via Screen
-  submitVia: {
+  submit: {
     title: 'Proposer une via',
+    subtitle: 'Votre proposition sera validée par un modérateur',
     name: 'Nom',
     location: 'Lieu',
-    department: 'Département',
-    country: 'Pays',
-    difficulty: 'Difficulté',
-    duration: 'Durée (h)',
-    length: 'Longueur (m)',
+    difficulty: 'Difficulté (1-7)',
+    duration: 'Durée (heures)',
+    approachTime: "Temps d'approche (min)",
+    returnTime: 'Temps de retour (min)',
     elevation: 'Dénivelé (m)',
-    altitude: 'Altitude max (m)',
     description: 'Description',
-    gpsLat: 'Latitude GPS',
-    gpsLng: 'Longitude GPS',
-    submit: 'Soumettre',
-    successMessage: 'Votre proposition a été envoyée !',
-    namePlaceholder: 'Nom de la via',
-    locationPlaceholder: 'Ville, région',
-    descriptionPlaceholder: 'Description de la via...',
+    descriptionHint: 'Décrivez la via, les équipements, les points forts...',
+    email: 'Votre email',
+    submit: 'Envoyer la proposition',
+    successTitle: 'Proposition envoyée !',
+    successMsg: 'Merci ! Votre proposition sera examinée par un modérateur.',
+    another: 'Proposer une autre via',
+    requiredFields: 'Le nom et le lieu sont requis',
+    error: "Erreur lors de l'envoi",
   },
 
-  // Settings Screen
   settings: {
     title: 'Paramètres',
     language: 'Langue',
     account: 'Compte',
+    explore: 'Explorer',
     logout: 'Se déconnecter',
     version: 'Version',
     about: 'À propos',
@@ -263,7 +265,6 @@ export default {
     },
   },
 
-  // Difficulty levels
   difficulty: {
     1: 'F',
     2: 'PD',

@@ -1,0 +1,20 @@
+# Build output
+build_output/
+
+# Node modules
+ViaFerrataApp/node_modules/
+
+# Gradle caches
+ViaFerrataApp/android/.gradle/
+ViaFerrataApp/android/app/build/
+ViaFerrataApp/android/build/
+
+# iOS
+ViaFerrataApp/ios/build/
+ViaFerrataApp/ios/Pods/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.DS_Store
