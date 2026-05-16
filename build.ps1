@@ -66,7 +66,7 @@ if (-not (Test-Command "java")) {
         Write-Fail "Java introuvable. Installez depuis https://adoptium.net puis relancez."
     }
 }
-$javaVer = (java -version 2>&1)[0]
+$javaVer = & cmd /c "java -version 2>&1" | Select-Object -First 1
 Write-OK "Java : $javaVer"
 
 if ([string]::IsNullOrEmpty($env:JAVA_HOME)) {
