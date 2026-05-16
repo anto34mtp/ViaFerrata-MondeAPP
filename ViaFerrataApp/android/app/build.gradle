@@ -2,6 +2,16 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+// PackageList.kt is provided manually — disable the autolinking generation task
+// that fails on Windows because react-native config cannot resolve packageName.
+gradle.projectsEvaluated {
+    tasks.configureEach { task ->
+        if (task.name.contains("generateAutolinkingPackageList")) {
+            task.enabled = false
+        }
+    }
+}
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
