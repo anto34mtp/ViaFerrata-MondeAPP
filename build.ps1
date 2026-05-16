@@ -79,13 +79,13 @@ if ([string]::IsNullOrEmpty($env:JAVA_HOME)) {
 
 # 3. Android SDK
 Write-Step "Verification Android SDK"
-$sdkCandidates = @(
+$sdkCandidates = @(@(
     $env:ANDROID_HOME,
     $env:ANDROID_SDK_ROOT,
     "$env:LOCALAPPDATA\Android\Sdk",
     "$env:USERPROFILE\AppData\Local\Android\Sdk",
     "C:\Android\Sdk"
-) | Where-Object { $_ -and (Test-Path $_) }
+) | Where-Object { $_ -and (Test-Path $_) })
 
 if ($sdkCandidates.Count -eq 0) {
     Write-Warn "Android SDK non detecte."
@@ -100,10 +100,10 @@ if ($sdkCandidates.Count -eq 0) {
     Write-Host "  3. Relancez ce script" -ForegroundColor Yellow
     Read-Host "Appuyez sur Entree une fois le SDK installe" | Out-Null
     Refresh-Path
-    $sdkCandidates = @(
+    $sdkCandidates = @(@(
         "$env:LOCALAPPDATA\Android\Sdk",
         "$env:USERPROFILE\AppData\Local\Android\Sdk"
-    ) | Where-Object { Test-Path $_ }
+    ) | Where-Object { Test-Path $_ })
 }
 
 if ($sdkCandidates.Count -gt 0) {
