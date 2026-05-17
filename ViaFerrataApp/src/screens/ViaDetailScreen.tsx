@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {useRoute, useNavigation} from '@react-navigation/native';
-import MapView, {Marker} from 'react-native-maps';
+import {WebView} from 'react-native-webview';
 import {getViaDetail, rateVia, commentVia, addFavorite, deleteFavorite, getFavorites, Via} from '../api/client';
 import {useLang} from '../context/LangContext';
 import {useAuth} from '../context/AuthContext';
@@ -23,6 +23,39 @@ import RatingBar from '../components/RatingBar';
 import {formatDuration, formatGPS} from '../utils/helpers';
 
 const {width} = Dimensions.get('window');
+
+function stripHtml(html: string | undefined | null): string {
+  if (!html) return '';
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function buildMiniMapHTML(lat: number, lng: number, name: string): string {
+  const safeName = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return `<!DOCTYPE html><html><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>*{margin:0;padding:0}html,body,#map{width:100%;height:200px}</style>
+</head><body>
+<div id="map"></div>
+<script>
+var map=L.map('map',{zoomControl:true,dragging:true,scrollWheelZoom:false}).setView([${lat},${lng}],13);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:19}).addTo(map);
+L.marker([${lat},${lng}]).addTo(map).bindPopup('${safeName}').openPopup();
+</script>
+</body></html>`;
+}
 
 const ViaDetailScreen: React.FC = () => {
   const {t} = useLang();
@@ -263,7 +296,7 @@ const ViaDetailScreen: React.FC = () => {
       {via.description ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t.viaDetail.description}</Text>
-          <Text style={styles.description}>{via.description}</Text>
+          <Text style={styles.description}>{stripHtml(via.description)}</Text>
         </View>
       ) : null}
 
@@ -273,7 +306,7 @@ const ViaDetailScreen: React.FC = () => {
           {via.pricing_info ? (
             <>
               <Text style={styles.cardTitle}>{t.viaDetail.pricing}</Text>
-              <Text style={styles.description}>{via.pricing_info}</Text>
+              <Text style={styles.description}>{stripHtml(via.pricing_info)}</Text>
             </>
           ) : null}
           {via.tourism_office ? (
@@ -281,7 +314,7 @@ const ViaDetailScreen: React.FC = () => {
               <Text style={[styles.cardTitle, {marginTop: via.pricing_info ? 12 : 0}]}>
                 {t.viaDetail.tourism}
               </Text>
-              <Text style={styles.description}>{via.tourism_office}</Text>
+              <Text style={styles.description}>{stripHtml(via.tourism_office)}</Text>
             </>
           ) : null}
         </View>
@@ -291,22 +324,13 @@ const ViaDetailScreen: React.FC = () => {
       {hasLocation ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t.viaDetail.location}</Text>
-          <MapView
+          <WebView
+            source={{html: buildMiniMapHTML(via.gps_lat!, via.gps_lng!, via.name)}}
             style={styles.map}
-            initialRegion={{
-              latitude: via.gps_lat!,
-              longitude: via.gps_lng!,
-              latitudeDelta: 0.05,
-              longitudeDelta: 0.05,
-            }}>
-            <Marker
-              coordinate={{
-                latitude: via.gps_lat!,
-                longitude: via.gps_lng!,
-              }}
-              title={via.name}
-            />
-          </MapView>
+            javaScriptEnabled
+            scrollEnabled={false}
+            originWhitelist={['*']}
+          />
         </View>
       ) : null}
 

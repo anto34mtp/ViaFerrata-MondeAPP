@@ -23,23 +23,18 @@ const HomeScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchData = useCallback(async () => {
-    try {
-      const [topRes, latestRes, statsRes] = await Promise.all([
-        getTopRatedVias(6),
-        getVias({page: 1, limit: 6, order_by: 'recent'}),
-        getStats(),
-      ]);
-      setTopRated(Array.isArray(topRes.data) ? topRes.data : []);
-      const latestBody = latestRes.data as any;
-      setLatest(Array.isArray(latestBody) ? latestBody : latestBody?.items || []);
-      setStats(statsRes.data);
-    } catch {
-      // API error — don't block the UI, empty state is shown instead
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [t]);
+    const [topRes, latestRes, statsRes] = await Promise.all([
+      getTopRatedVias(6).catch(() => ({data: [] as Via[]})),
+      getVias({page: 1, limit: 6, order_by: 'recent'}).catch(() => ({data: {items: [] as Via[]}})),
+      getStats().catch(() => ({data: null as Stats | null})),
+    ]);
+    setTopRated(Array.isArray(topRes.data) ? topRes.data : []);
+    const latestBody = latestRes.data as any;
+    setLatest(Array.isArray(latestBody) ? latestBody : latestBody?.items || []);
+    setStats(statsRes.data);
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
 
   useEffect(() => {
     fetchData();

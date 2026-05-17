@@ -448,6 +448,39 @@ if ($r0 === 'dashboard') {
     try { $recentFavs  = $favModel->getByUser($uid, null); }      catch (Throwable $e) { $recentFavs = []; }
     try { $recentLog   = $logModel->getByUser($uid); }            catch (Throwable $e) { $recentLog = []; }
 
+    // Favorite::getByUser() does SELECT f.*, v.* so v.id overwrites f.id.
+    // Restructure to expose the nested via object the app expects.
+    $recentFavsFormatted = array_map(function($f) {
+        return [
+            'id'         => (int)($f['via_id'] ?? 0),
+            'via_id'     => (int)($f['via_id'] ?? 0),
+            'status'     => $f['status'] ?? 'to_do',
+            'created_at' => $f['updated_at'] ?? '',
+            'via' => [
+                'id'   => (int)($f['via_id'] ?? 0),
+                'name' => $f['name'] ?? ('Via #' . ($f['via_id'] ?? '?')),
+                'slug' => $f['slug'] ?? '',
+            ],
+        ];
+    }, array_slice($recentFavs, 0, 5));
+
+    // Logbook::getByUser() selects v.name AS via_name, v.slug AS via_slug explicitly.
+    $recentLogFormatted = array_map(function($l) {
+        return [
+            'id'         => (int)($l['id'] ?? 0),
+            'via_id'     => (int)($l['via_id'] ?? 0),
+            'done_date'  => $l['done_date'] ?? '',
+            'conditions' => $l['conditions'] ?? null,
+            'companion'  => $l['companion'] ?? null,
+            'notes'      => $l['notes'] ?? null,
+            'via' => [
+                'id'   => (int)($l['via_id'] ?? 0),
+                'name' => $l['via_name'] ?? ('Via #' . ($l['via_id'] ?? '?')),
+                'slug' => $l['via_slug'] ?? '',
+            ],
+        ];
+    }, array_slice($recentLog, 0, 5));
+
     mok([
         'stats' => [
             'favorites_count'  => $favCount,
@@ -457,8 +490,8 @@ if ($r0 === 'dashboard') {
             'logbook_this_year'=> $logYear,
             'trips_count'      => count($trips),
         ],
-        'recent_favorites' => $recentFavs,
-        'recent_logbook'   => $recentLog,
+        'recent_favorites' => $recentFavsFormatted,
+        'recent_logbook'   => $recentLogFormatted,
         'trips'            => $trips,
     ]);
 }

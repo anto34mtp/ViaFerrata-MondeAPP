@@ -85,13 +85,13 @@ export default function SettingsScreen() {
       {/* Navigation section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('settings.explore')}</Text>
-        <MenuItem icon="🏔" label={t('nav.catalog')} onPress={() => navigation.navigate('Main' as any)} />
-        <MenuItem icon="🗺" label={t('nav.map')} onPress={() => navigation.navigate('Main' as any)} />
+        <MenuItem icon="🏔" label={t('nav.catalog')} onPress={() => navigation.navigate('Catalog' as any)} />
+        <MenuItem icon="🗺" label={t('nav.map')} onPress={() => navigation.navigate('Map' as any)} />
         {user && (
           <>
-            <MenuItem icon="⭐" label={t('nav.favorites')} onPress={() => navigation.navigate('Main' as any)} />
-            <MenuItem icon="📖" label={t('nav.logbook')} onPress={() => navigation.navigate('Main' as any)} />
-            <MenuItem icon="🚀" label={t('nav.trips')} onPress={() => navigation.navigate('Main' as any)} />
+            <MenuItem icon="⭐" label={t('nav.favorites')} onPress={() => navigation.navigate('Favorites')} />
+            <MenuItem icon="📖" label={t('nav.logbook')} onPress={() => navigation.navigate('Logbook')} />
+            <MenuItem icon="🚀" label={t('nav.trips')} onPress={() => navigation.navigate('RoadTrips')} />
           </>
         )}
         <MenuItem icon="➕" label={t('submit.title')} onPress={() => navigation.navigate('SubmitVia')} />
