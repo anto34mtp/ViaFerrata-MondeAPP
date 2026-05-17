@@ -113,7 +113,12 @@ class Favorite {
             $params[':status'] = $status;
         }
 
-        return $this->db->fetchAll($query, $params);
+        try {
+            return $this->db->fetchAll($query, $params);
+        } catch (\PDOException $e) {
+            error_log('Favorite::getByUser error: ' . $e->getMessage());
+            return [];
+        }
     }
 
     /**

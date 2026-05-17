@@ -173,7 +173,7 @@ try {
 
     // Paginated list — inclut le nombre de parties enfants
     $list_stmt = $pdo->prepare("
-        SELECT v.*, d.code as department_code,
+        SELECT v.*, ANY_VALUE(d.code) as department_code,
                AVG((r.rating_general + r.rating_beauty + r.rating_difficulty)/3) as avg_overall,
                COUNT(DISTINCT r.id) as total_ratings,
                (SELECT COUNT(*) FROM vias v2 WHERE v2.parent_id = v.id) AS children_count
