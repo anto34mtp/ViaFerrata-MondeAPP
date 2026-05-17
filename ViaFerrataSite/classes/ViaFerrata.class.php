@@ -78,7 +78,7 @@ class ViaFerrata {
      * @return array
      */
     public function search(array $filters = [], int $limit = 50, int $offset = 0): array {
-        $conditions = ["v.is_active = 1"];
+        $conditions = ["v.is_active = 1", "v.is_approved = 1"];
         $params = [];
 
         // Filtre texte global (nom + localisation + département)
@@ -109,6 +109,12 @@ class ViaFerrata {
             $params[':department_code'] = $filters['department_code'];
         }
 
+        // Filtre par pays
+        if (!empty($filters['country'])) {
+            $conditions[] = "v.country = :country";
+            $params[':country'] = $filters['country'];
+        }
+
         // Filtre par difficulté minimale
         if (isset($filters['difficulty_min'])) {
             $conditions[] = "v.difficulty >= :difficulty_min";
@@ -135,6 +141,9 @@ class ViaFerrata {
             switch ($filters['order_by']) {
                 case 'name':
                     $orderBy = "v.name ASC";
+                    break;
+                case 'recent':
+                    $orderBy = "v.created_at DESC";
                     break;
                 case 'rating':
                     $orderBy = "vrs.avg_overall DESC";
@@ -215,7 +224,7 @@ class ViaFerrata {
      * @return int
      */
     public function count(array $filters = []): int {
-        $conditions = ["v.is_active = 1"];
+        $conditions = ["v.is_active = 1", "v.is_approved = 1"];
         $params = [];
         $needsDept = false;
 
@@ -242,6 +251,11 @@ class ViaFerrata {
             $conditions[] = "d.code = :department_code";
             $params[':department_code'] = $filters['department_code'];
             $needsDept = true;
+        }
+
+        if (!empty($filters['country'])) {
+            $conditions[] = "v.country = :country";
+            $params[':country'] = $filters['country'];
         }
 
         if (isset($filters['difficulty_min'])) {

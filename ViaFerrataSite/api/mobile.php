@@ -55,6 +55,35 @@ function normalizeUrl(string $url): string {
     return $url;
 }
 
+// Normalise les noms de colonnes DB vers les champs attendus par l'app mobile
+function normalizeVia(array $v): array {
+    return [
+        'id'                    => (int)($v['id'] ?? 0),
+        'slug'                  => $v['slug'] ?? '',
+        'name'                  => $v['name'] ?? '',
+        'location'              => $v['location'] ?? null,
+        'department_name'       => $v['department_name'] ?? null,
+        'department_code'       => $v['department_code'] ?? null,
+        'country'               => $v['country'] ?? null,
+        'difficulty'            => isset($v['difficulty']) && $v['difficulty'] !== null ? (int)$v['difficulty'] : null,
+        'duration_min'          => isset($v['duration_hours']) && $v['duration_hours'] !== null ? (int)$v['duration_hours'] : null,
+        'length_m'              => isset($v['length_meters']) && $v['length_meters'] !== null ? (int)$v['length_meters'] : null,
+        'elevation_m'           => isset($v['elevation_gain']) && $v['elevation_gain'] !== null ? (int)$v['elevation_gain'] : null,
+        'altitude_max_m'        => isset($v['altitude_max']) && $v['altitude_max'] !== null ? (int)$v['altitude_max'] : null,
+        'gps_lat'               => isset($v['latitude']) && $v['latitude'] !== null ? (float)$v['latitude'] : null,
+        'gps_lng'               => isset($v['longitude']) && $v['longitude'] !== null ? (float)$v['longitude'] : null,
+        'opening_status'        => $v['opening_status'] ?? null,
+        'description'           => $v['description'] ?? null,
+        'pricing_info'          => $v['pricing'] ?? null,
+        'tourism_office'        => $v['tourism_office_name'] ?? null,
+        'avg_rating_general'    => isset($v['avg_general']) && $v['avg_general'] !== null ? round((float)$v['avg_general'], 1) : null,
+        'avg_rating_beauty'     => isset($v['avg_beauty']) && $v['avg_beauty'] !== null ? round((float)$v['avg_beauty'], 1) : null,
+        'avg_rating_difficulty' => isset($v['avg_difficulty']) && $v['avg_difficulty'] !== null ? round((float)$v['avg_difficulty'], 1) : null,
+        'ratings_count'         => isset($v['total_ratings']) && $v['total_ratings'] !== null ? (int)$v['total_ratings'] : null,
+        'image_url'             => !empty($v['image_url']) ? normalizeUrl($v['image_url']) : null,
+    ];
+}
+
 // ── Routing ───────────────────────────────────────────────────────────────────
 // URL format: /mobile-api/{r0}/{r1}/{r2}
 $base   = $mobile_path ?? '';
@@ -130,48 +159,69 @@ if ($r0 === 'vias') {
 
     if ($r1 === 'top-rated' && $method === 'GET') {
         $limit = min(50, max(1, (int)($_GET['limit'] ?? 20)));
-        mok($viaModel->getTopRated($limit));
+        try {
+            $rows = $viaModel->getTopRated($limit);
+            mok(array_map('normalizeVia', $rows));
+        } catch (Throwable $e) {
+            mok([]);
+        }
     }
 
     // Endpoint carte : toutes les vias avec coordonnées GPS
     if ($r1 === 'map' && $method === 'GET') {
-        $rows = $db->fetchAll(
-            "SELECT v.id, v.name, v.slug, v.latitude, v.longitude, v.difficulty, v.image_url,
-                    d.name as department_name, vrs.avg_overall
-             FROM vias v
-             LEFT JOIN departments d ON v.department_id = d.code
-             LEFT JOIN via_ratings_summary vrs ON v.id = vrs.via_id
-             WHERE v.is_active = 1 AND v.is_approved = 1
-               AND v.latitude IS NOT NULL AND v.longitude IS NOT NULL
-               AND v.latitude != 0 AND v.longitude != 0
-             ORDER BY v.name ASC"
-        );
-        foreach ($rows as &$r) {
-            $r['latitude']  = (float)$r['latitude'];
-            $r['longitude'] = (float)$r['longitude'];
-            if (!empty($r['image_url'])) $r['image_url'] = normalizeUrl($r['image_url']);
+        try {
+            $db = Database::getInstance();
+            $rows = $db->fetchAll(
+                "SELECT v.id, v.name, v.slug, v.latitude, v.longitude, v.difficulty, v.country,
+                        v.image_url, d.name as department_name, vrs.avg_overall
+                 FROM vias v
+                 LEFT JOIN departments d ON v.department_id = d.code
+                 LEFT JOIN via_ratings_summary vrs ON v.id = vrs.via_id
+                 WHERE v.is_active = 1 AND v.is_approved = 1
+                   AND v.latitude IS NOT NULL AND v.longitude IS NOT NULL
+                   AND v.latitude != 0 AND v.longitude != 0
+                 ORDER BY v.name ASC"
+            );
+        } catch (Throwable $e) {
+            $rows = [];
         }
-        mok($rows);
+        $points = [];
+        foreach ($rows as $r) {
+            $points[] = [
+                'id'              => (int)$r['id'],
+                'slug'            => $r['slug'],
+                'name'            => $r['name'],
+                'gps_lat'         => (float)$r['latitude'],
+                'gps_lng'         => (float)$r['longitude'],
+                'difficulty'      => $r['difficulty'] !== null ? (int)$r['difficulty'] : null,
+                'country'         => $r['country'] ?? null,
+                'department_name' => $r['department_name'] ?? null,
+                'avg_overall'     => $r['avg_overall'] !== null ? round((float)$r['avg_overall'], 1) : null,
+                'image_url'       => !empty($r['image_url']) ? normalizeUrl($r['image_url']) : null,
+            ];
+        }
+        mok($points);
     }
 
     if ($r1 === '' && $method === 'GET') {
-        $page  = max(1, (int)($_GET['page'] ?? 1));
-        $limit = min(50, max(1, (int)($_GET['limit'] ?? 20)));
+        $page   = max(1, (int)($_GET['page'] ?? 1));
+        $limit  = min(50, max(1, (int)($_GET['limit'] ?? 20)));
         $offset = ($page - 1) * $limit;
         $filters = [];
-        if (!empty($_GET['search']))          $filters['search']         = $_GET['search'];
-        if (!empty($_GET['department_code'])) $filters['department_code']= $_GET['department_code'];
-        if (!empty($_GET['country']))         $filters['country']        = $_GET['country'];
-        if (isset($_GET['difficulty_min']))   $filters['difficulty_min'] = (int)$_GET['difficulty_min'];
-        if (isset($_GET['difficulty_max']))   $filters['difficulty_max'] = (int)$_GET['difficulty_max'];
-        if (!empty($_GET['order_by']))        $filters['order_by']       = $_GET['order_by'];
+        if (!empty($_GET['search']))          $filters['search']          = $_GET['search'];
+        if (!empty($_GET['department_code'])) $filters['department_code'] = $_GET['department_code'];
+        if (!empty($_GET['country']))         $filters['country']         = $_GET['country'];
+        if (isset($_GET['difficulty_min']))   $filters['difficulty_min']  = (int)$_GET['difficulty_min'];
+        if (isset($_GET['difficulty_max']))   $filters['difficulty_max']  = (int)$_GET['difficulty_max'];
+        if (!empty($_GET['order_by']))        $filters['order_by']        = $_GET['order_by'];
 
-        $total = $viaModel->count($filters);
-        $items = $viaModel->search($filters, $limit, $offset);
-        foreach ($items as &$item) {
-            if (!empty($item['image_url'])) $item['image_url'] = normalizeUrl($item['image_url']);
+        try {
+            $total = $viaModel->count($filters);
+            $items = $viaModel->search($filters, $limit, $offset);
+            mok(['items' => array_map('normalizeVia', $items), 'total' => $total, 'page' => $page, 'limit' => $limit]);
+        } catch (Throwable $e) {
+            mok(['items' => [], 'total' => 0, 'page' => $page, 'limit' => $limit]);
         }
-        mok(['items' => $items, 'total' => $total, 'page' => $page, 'limit' => $limit]);
     }
 
     if ($r1 !== '' && $r2 === '' && $method === 'GET') {
@@ -179,21 +229,27 @@ if ($r0 === 'vias') {
         $via = $viaModel->getBySlug($r1);
         if (!$via) merr('Via ferrata introuvable', 404);
 
-        $ratingModel  = new Rating();
-        $commentModel = new Comment();
-        $photoModel   = new Photo();
+        $data = normalizeVia($via);
 
-        $via['ratings']  = $ratingModel->getByVia($via['id']);
-        $via['comments'] = $commentModel->getByVia($via['id']);
-        $photos = $photoModel->getApprovedByVia($via['id']);
-        foreach ($photos as &$p) {
-            if (!empty($p['file_path'])) $p['file_path'] = normalizeUrl($p['file_path']);
+        try {
+            $ratingModel  = new Rating();
+            $commentModel = new Comment();
+            $photoModel   = new Photo();
+            $data['ratings']  = $ratingModel->getByVia($via['id']);
+            $data['comments'] = $commentModel->getByVia($via['id']);
+            $photos = $photoModel->getApprovedByVia($via['id']);
+            foreach ($photos as &$p) {
+                $fileUrl = !empty($p['file_path']) ? normalizeUrl($p['file_path']) : null;
+                $p['url']       = $fileUrl;
+                $p['file_path'] = $fileUrl;
+            }
+            $data['photos'] = $photos;
+        } catch (Throwable $e) {
+            $data['ratings']  = [];
+            $data['comments'] = [];
+            $data['photos']   = [];
         }
-        $via['photos']   = $photos;
-        if (!empty($via['image_url'])) $via['image_url'] = normalizeUrl($via['image_url']);
-        if (!empty($via['latitude']))  $via['latitude']  = (float)$via['latitude'];
-        if (!empty($via['longitude'])) $via['longitude'] = (float)$via['longitude'];
-        mok($via);
+        mok($data);
     }
 
     if ($r1 !== '' && $r2 === 'rate' && $method === 'POST') {
@@ -383,18 +439,27 @@ if ($r0 === 'dashboard') {
     $tripModel = new RoadTrip();
     $viaModel  = new ViaFerrata();
 
+    try { $favCount    = $favModel->countByUser($uid); }          catch (Throwable $e) { $favCount = 0; }
+    try { $todoCount   = $favModel->countByUser($uid, 'to_do'); } catch (Throwable $e) { $todoCount = 0; }
+    try { $doneCount   = $favModel->countByUser($uid, 'done'); }  catch (Throwable $e) { $doneCount = 0; }
+    try { $logCount    = $logModel->countByUser($uid); }          catch (Throwable $e) { $logCount = 0; }
+    try { $logYear     = $logModel->countThisYear($uid); }        catch (Throwable $e) { $logYear = 0; }
+    try { $trips       = $tripModel->getByUser($uid); }           catch (Throwable $e) { $trips = []; }
+    try { $recentFavs  = $favModel->getByUser($uid, null); }      catch (Throwable $e) { $recentFavs = []; }
+    try { $recentLog   = $logModel->getByUser($uid); }            catch (Throwable $e) { $recentLog = []; }
+
     mok([
         'stats' => [
-            'favorites_count'  => $favModel->countByUser($uid),
-            'to_do_count'      => $favModel->countByUser($uid, 'to_do'),
-            'done_count'       => $favModel->countByUser($uid, 'done'),
-            'logbook_count'    => $logModel->countByUser($uid),
-            'logbook_this_year'=> $logModel->countThisYear($uid),
-            'trips_count'      => count($tripModel->getByUser($uid)),
+            'favorites_count'  => $favCount,
+            'to_do_count'      => $todoCount,
+            'done_count'       => $doneCount,
+            'logbook_count'    => $logCount,
+            'logbook_this_year'=> $logYear,
+            'trips_count'      => count($trips),
         ],
-        'recent_favorites' => $favModel->getByUser($uid, null),
-        'recent_logbook'   => $logModel->getByUser($uid),
-        'trips'            => $tripModel->getByUser($uid),
+        'recent_favorites' => $recentFavs,
+        'recent_logbook'   => $recentLog,
+        'trips'            => $trips,
     ]);
 }
 
@@ -402,10 +467,19 @@ if ($r0 === 'dashboard') {
 // COUNTRIES / STATS  (public)
 // ═══════════════════════════════════════════════════════════════════
 if ($r0 === 'stats') {
-    $db = Database::getInstance();
-    $total = (int)$db->fetchOne("SELECT COUNT(*) AS c FROM vias WHERE is_active=1 AND is_approved=1")['c'];
-    $countries = (int)$db->fetchOne("SELECT COUNT(DISTINCT country) AS c FROM vias WHERE is_active=1 AND is_approved=1 AND country IS NOT NULL")['c'];
-    mok(['total_vias' => $total, 'countries' => $countries]);
+    try {
+        $db = Database::getInstance();
+        $total = (int)($db->fetchOne("SELECT COUNT(*) AS c FROM vias WHERE is_active=1 AND is_approved=1")['c'] ?? 0);
+        // country peut ne pas exister sur certaines installations — on tente, sinon 0
+        try {
+            $countries = (int)($db->fetchOne("SELECT COUNT(DISTINCT country) AS c FROM vias WHERE is_active=1 AND is_approved=1 AND country IS NOT NULL")['c'] ?? 0);
+        } catch (Throwable $e) {
+            $countries = 0;
+        }
+        mok(['total_vias' => $total, 'countries' => $countries]);
+    } catch (Throwable $e) {
+        mok(['total_vias' => 0, 'countries' => 0]);
+    }
 }
 
 // ── API root ─────────────────────────────────────────────────────────────────

@@ -134,7 +134,7 @@ export interface DashboardData {
 
 export interface Stats {
   total_vias: number;
-  countries: number;
+  countries: number; // nombre de pays distincts
 }
 
 // ─── API Functions ────────────────────────────────────────────────────────────
