@@ -2,54 +2,18 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
-// Disable RNGP tasks that call react-native config (fails on Windows — packageName not resolved)
-gradle.projectsEvaluated {
-    tasks.configureEach { task ->
-        if (task.name.contains("generateAutolinkingPackageList") ||
-            task.name.contains("generateReactNativeEntryPoint")) {
-            task.enabled = false
-        }
-    }
-}
-
-/**
- * This is the configuration block to customize your React Native Android app.
- * By default you don't need to apply any configuration, just uncomment the lines you need.
- */
 react {
-    /* Folders */
-    // root = file("../")
-    // reactNativeDir = file("../node_modules/react-native")
-    // codegenDir = file("../node_modules/@react-native/codegen")
-    // cliFile = file("../node_modules/react-native/cli.js")
-
-    /* Bundling */
-    // bundleInDebug = false
-    // bundleInRelease = true
-    // jsRootDir = file("../src")
-
-    /* Bundle name */
-    // bundleAssetName = "MetroBundle"
-
-    /* Packager */
-    // enableHermes = true
+    // Configuration automatique via RNGP
 }
 
-/**
- * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
- */
 def enableProguardInReleaseBuilds = true
 
-/**
- * Keystore configuration — reads from gradle.properties (or -P flags passed by build.sh)
- */
 def keystorePropertiesFile = rootProject.file("../keystore/keystore.properties")
 def keystoreProperties = new Properties()
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
-// Allow override via command-line -P flags (used by build.sh)
 def ksPath          = project.hasProperty('KEYSTORE_PATH')           ? project.KEYSTORE_PATH           : (keystoreProperties['storeFile'] ? "../keystore/${keystoreProperties['storeFile']}" : "../../keystore/viaferrata.keystore")
 def ksStorePassword = project.hasProperty('KEYSTORE_STORE_PASSWORD') ? project.KEYSTORE_STORE_PASSWORD : (keystoreProperties['storePassword'] ?: "")
 def ksKeyAlias      = project.hasProperty('KEYSTORE_KEY_ALIAS')      ? project.KEYSTORE_KEY_ALIAS      : (keystoreProperties['keyAlias'] ?: "")
@@ -57,6 +21,7 @@ def ksKeyPassword   = project.hasProperty('KEYSTORE_KEY_PASSWORD')   ? project.K
 
 android {
     ndkVersion rootProject.ext.ndkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.viaferrataapp"
@@ -80,7 +45,7 @@ android {
 
     buildTypes {
         debug {
-            signingConfig signingConfigs.debug
+            // Gradle utilise automatiquement le debug keystore par defaut
         }
         release {
             signingConfig signingConfigs.release
@@ -94,3 +59,5 @@ dependencies {
     implementation("com.facebook.react:react-android")
     implementation("com.facebook.react:hermes-android")
 }
+
+apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)

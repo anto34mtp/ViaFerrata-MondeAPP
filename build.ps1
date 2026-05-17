@@ -187,20 +187,12 @@ Write-OK "Dependances npm OK."
 
 # 8. Patch RNGP (serviceOf supprime dans Gradle 8.8+)
 Write-Step "Patch compatibilite RNGP / Gradle 8.13"
-$RngpFile = Join-Path $AppDir "node_modules\@react-native\gradle-plugin\build.gradle.kts"
-if (Test-Path $RngpFile) {
-    $rngpContent = Get-Content $RngpFile -Raw -Encoding UTF8
-    $rngpPatched = $rngpContent `
-        -replace '(?m)^[^\r\n]*import\s+org\.gradle\.configurationcache\.extensions\.serviceOf[^\r\n]*\r?\n', '' `
-        -replace '(?m)^[^\r\n]*serviceOf<[^>]+>\(\)[^\r\n]*\r?\n', ''
-    if ($rngpPatched -ne $rngpContent) {
-        [System.IO.File]::WriteAllText($RngpFile, $rngpPatched, [System.Text.Encoding]::UTF8)
-        Write-OK "RNGP patche (serviceOf supprime)."
-    } else {
-        Write-OK "RNGP deja patche ou serviceOf absent."
-    }
+$PatchScript = Join-Path $AppDir "scripts\patch-rngp.js"
+if (Test-Path $PatchScript) {
+    & node $PatchScript
+    if ($LASTEXITCODE -ne 0) { Write-Warn "Patch RNGP a echoue -- on continue." }
 } else {
-    Write-Warn "Fichier RNGP introuvable -- node_modules absent ? Continuer..."
+    Write-Warn "Script de patch introuvable : $PatchScript"
 }
 
 # 9. Gradle clean (optionnel)
