@@ -121,9 +121,12 @@ export interface Trip {
 
 export interface DashboardData {
   stats: {
-    total_favorites?: number;
-    total_logbook?: number;
-    total_trips?: number;
+    favorites_count?: number;
+    to_do_count?: number;
+    done_count?: number;
+    logbook_count?: number;
+    logbook_this_year?: number;
+    trips_count?: number;
   };
   recent_favorites: Favorite[];
   recent_logbook: LogbookEntry[];

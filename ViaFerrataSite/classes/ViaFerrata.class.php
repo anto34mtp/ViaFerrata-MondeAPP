@@ -78,7 +78,7 @@ class ViaFerrata {
      * @return array
      */
     public function search(array $filters = [], int $limit = 50, int $offset = 0): array {
-        $conditions = ["v.is_active = 1", "v.is_approved = 1"];
+        $conditions = ["v.is_active = 1"];
         $params = [];
 
         // Filtre texte global (nom + localisation + département)
@@ -224,7 +224,7 @@ class ViaFerrata {
      * @return int
      */
     public function count(array $filters = []): int {
-        $conditions = ["v.is_active = 1", "v.is_approved = 1"];
+        $conditions = ["v.is_active = 1"];
         $params = [];
         $needsDept = false;
 

@@ -79,17 +79,17 @@ const DashboardScreen: React.FC = () => {
         <View style={styles.statsRow}>
           <StatCard
             icon="❤️"
-            value={data.stats.total_favorites || 0}
+            value={data.stats.favorites_count || 0}
             label={t.dashboard.totalFavorites}
           />
           <StatCard
             icon="📓"
-            value={data.stats.total_logbook || 0}
+            value={data.stats.logbook_count || 0}
             label={t.dashboard.totalLogbook}
           />
           <StatCard
             icon="🗺️"
-            value={data.stats.total_trips || 0}
+            value={data.stats.trips_count || 0}
             label={t.dashboard.totalTrips}
           />
         </View>

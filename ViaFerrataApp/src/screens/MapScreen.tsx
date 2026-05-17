@@ -1,106 +1,89 @@
-import React, {useEffect, useState, useCallback} from 'react';
+import React, {useRef, useState} from 'react';
 import {
   View,
+  ActivityIndicator,
   Text,
   StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  Modal,
+  Platform,
 } from 'react-native';
-import MapView, {Marker, Callout} from 'react-native-maps';
+import {WebView, WebViewNavigation} from 'react-native-webview';
 import {useNavigation} from '@react-navigation/native';
-import {getMapVias, MapPoint} from '../api/client';
+import {useAuth} from '../context/AuthContext';
 import {useLang} from '../context/LangContext';
-import DifficultyBadge from '../components/DifficultyBadge';
+
+const BASE_URL = 'https://viaferrata-monde.fr';
 
 const MapScreen: React.FC = () => {
   const {t} = useLang();
+  const {token} = useAuth();
   const navigation = useNavigation<any>();
-  const [points, setPoints] = useState<MapPoint[]>([]);
+  const webRef = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<MapPoint | null>(null);
+  const [error, setError] = useState(false);
 
-  const fetchPoints = useCallback(async () => {
-    try {
-      const res = await getMapVias();
-      const data = Array.isArray(res.data) ? res.data : [];
-      setPoints(data.filter(p => p.gps_lat && p.gps_lng));
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
+  // Build map URL — pass JWT token if logged in so the map can call auth'd endpoints
+  const mapUrl =
+    BASE_URL +
+    '/mobile-map' +
+    (token ? '?token=' + encodeURIComponent(token) : '');
+
+  // Intercept viaferrata://via/{slug} deep-links posted by the Leaflet popup
+  const handleNavChange = (state: WebViewNavigation): boolean => {
+    const url = state.url ?? '';
+    if (url.startsWith('viaferrata://via/')) {
+      const slug = url.replace('viaferrata://via/', '').split('?')[0];
+      navigation.navigate('ViaDetail', {slug, name: slug});
+      return false; // block the WebView from navigating
     }
-  }, []);
+    // Allow http(s) navigation (tile loading, API calls)
+    return true;
+  };
 
-  useEffect(() => {
-    fetchPoints();
-  }, [fetchPoints]);
+  // Also handle postMessage from the page as an alternative
+  const handleMessage = (event: {nativeEvent: {data: string}}) => {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data);
+      if (msg.type === 'via' && msg.slug) {
+        navigation.navigate('ViaDetail', {slug: msg.slug, name: msg.name ?? msg.slug});
+      }
+    } catch {}
+  };
 
-  if (loading) {
+  if (error) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2E7D32" />
-        <Text style={styles.loadingText}>{t.map.loading}</Text>
+      <View style={styles.centered}>
+        <Text style={styles.errorEmoji}>🌐</Text>
+        <Text style={styles.errorText}>
+          Impossible de charger la carte.{'\n'}Vérifiez votre connexion.
+        </Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <MapView
-        style={styles.map}
-        initialRegion={{
-          latitude: 45.8,
-          longitude: 6.5,
-          latitudeDelta: 20,
-          longitudeDelta: 20,
-        }}>
-        {points.map(point => (
-          <Marker
-            key={point.id}
-            coordinate={{
-              latitude: point.gps_lat,
-              longitude: point.gps_lng,
-            }}
-            title={point.name}
-            onPress={() => setSelected(point)}
-            pinColor="#2E7D32"
-          />
-        ))}
-      </MapView>
-
-      <View style={styles.countBadge}>
-        <Text style={styles.countText}>{points.length} vias</Text>
-      </View>
-
-      {/* Selected via popup */}
-      {selected && (
-        <View style={styles.popup}>
-          <TouchableOpacity
-            style={styles.popupClose}
-            onPress={() => setSelected(null)}>
-            <Text style={styles.popupCloseText}>✕</Text>
-          </TouchableOpacity>
-          <Text style={styles.popupName}>{selected.name}</Text>
-          <View style={styles.popupRow}>
-            {selected.difficulty ? (
-              <DifficultyBadge level={selected.difficulty} size="small" />
-            ) : null}
-            {selected.country ? (
-              <Text style={styles.popupCountry}>{selected.country}</Text>
-            ) : null}
-          </View>
-          <TouchableOpacity
-            style={styles.popupBtn}
-            onPress={() => {
-              setSelected(null);
-              navigation.navigate('ViaDetail', {
-                slug: selected.slug,
-                name: selected.name,
-              });
-            }}>
-            <Text style={styles.popupBtnText}>{t.map.viewVia} →</Text>
-          </TouchableOpacity>
+      <WebView
+        ref={webRef}
+        source={{uri: mapUrl}}
+        style={styles.webview}
+        javaScriptEnabled
+        domStorageEnabled
+        originWhitelist={['https://*', 'viaferrata://*']}
+        // Intercept deep-link navigation
+        onShouldStartLoadWithRequest={handleNavChange}
+        onMessage={handleMessage}
+        onLoadEnd={() => setLoading(false)}
+        onError={() => {
+          setLoading(false);
+          setError(true);
+        }}
+        // Fix Android mixed-content (tile CDN over http)
+        mixedContentMode={Platform.OS === 'android' ? 'always' : undefined}
+      />
+      {loading && (
+        <View style={styles.overlay}>
+          <ActivityIndicator size="large" color="#2E7D32" />
+          <Text style={styles.overlayText}>{t.map?.loading ?? 'Chargement…'}</Text>
         </View>
       )}
     </View>
@@ -109,86 +92,23 @@ const MapScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {flex: 1},
-  loadingContainer: {
+  webview: {flex: 1},
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  overlayText: {marginTop: 12, fontSize: 15, color: '#666'},
+  centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F5F5F5',
+    padding: 32,
   },
-  loadingText: {
-    marginTop: 12,
-    color: '#666',
-    fontSize: 15,
-  },
-  map: {
-    flex: 1,
-  },
-  countBadge: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    backgroundColor: '#2E7D32',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  countText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  popup: {
-    position: 'absolute',
-    bottom: 24,
-    left: 16,
-    right: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  popupClose: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    padding: 4,
-  },
-  popupCloseText: {
-    fontSize: 16,
-    color: '#999',
-  },
-  popupName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1A1A1A',
-    marginBottom: 8,
-    marginRight: 24,
-  },
-  popupRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  popupCountry: {
-    fontSize: 13,
-    color: '#666',
-  },
-  popupBtn: {
-    backgroundColor: '#2E7D32',
-    borderRadius: 8,
-    padding: 10,
-    alignItems: 'center',
-  },
-  popupBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-  },
+  errorEmoji: {fontSize: 48, marginBottom: 16},
+  errorText: {fontSize: 15, color: '#666', textAlign: 'center', lineHeight: 22},
 });
 
 export default MapScreen;

@@ -25,6 +25,9 @@ export type RootStackParamList = {
   ViaDetail: {slug: string};
   Login: undefined;
   Register: undefined;
+  Favorites: undefined;
+  Logbook: undefined;
+  RoadTrips: undefined;
   RoadTripDetail: {id: number};
   RoadTripCreate: undefined;
   SubmitVia: undefined;
@@ -92,6 +95,9 @@ export default function AppNavigator() {
       <Stack.Screen name="ViaDetail" component={ViaDetailScreen} options={{title: 'Détail'}} />
       <Stack.Screen name="Login" component={LoginScreen} options={{title: 'Connexion'}} />
       <Stack.Screen name="Register" component={RegisterScreen} options={{title: 'Inscription'}} />
+      <Stack.Screen name="Favorites" component={FavoritesScreen} options={{title: 'Favoris'}} />
+      <Stack.Screen name="Logbook" component={LogbookScreen} options={{title: 'Carnet de sorties'}} />
+      <Stack.Screen name="RoadTrips" component={RoadTripsScreen} options={{title: 'Road Trips'}} />
       <Stack.Screen name="RoadTripDetail" component={RoadTripDetailScreen} options={{title: 'Road Trip'}} />
       <Stack.Screen name="RoadTripCreate" component={RoadTripCreateScreen} options={{title: 'Nouveau Road Trip'}} />
       <Stack.Screen name="SubmitVia" component={SubmitViaScreen} options={{title: 'Proposer une via'}} />
