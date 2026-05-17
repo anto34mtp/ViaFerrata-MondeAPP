@@ -21,3 +21,4 @@ ViaFerrataApp/ios/Pods/
 .vscode/
 *.iml
 .DS_Store
+*.lock
