@@ -296,6 +296,8 @@ Write-Host ""
 if ($Format -eq "AAB") {
     Write-Host "  Pret pour le Google Play Store." -ForegroundColor Cyan
 } else {
+    Write-Host "  IMPORTANT : Desinstalle d'abord l'ancienne version du tel" -ForegroundColor Yellow
+    Write-Host "              (Parametres > Apps > ViaFerrata > Desinstaller)" -ForegroundColor Yellow
     Write-Host "  Installer sur un appareil : adb install `"$Dest`"" -ForegroundColor Cyan
 }
 
