@@ -117,6 +117,11 @@ switch ($segment0) {
         require __DIR__ . '/api/mobile.php';
         break;
 
+    case 'mobile-map':
+        // Carte Leaflet/OSM embarquable dans un WebView Android/iOS
+        require __DIR__ . '/views/mobile_map.php';
+        break;
+
     case 'api':
         header('Content-Type: application/json; charset=utf-8');
         if (!$auth->isLoggedIn()) { echo json_encode(['ok' => false, 'msg' => 'Non connecté']); exit; }
