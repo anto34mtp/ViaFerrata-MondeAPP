@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Patches @react-native/gradle-plugin/build.gradle.kts to remove the
-// testRuntimeOnly block that uses serviceOf — an API removed in Gradle 8.8+.
-// Handles both LF (Linux/Mac) and CRLF (Windows) line endings.
-// Also handles files already partially patched (serviceOf line gone but rest remains).
+// Replaces @react-native/gradle-plugin/build.gradle.kts with a fixed version.
+// Removes:
+//   1. serviceOf<ModuleRegistry>() block (removed in Gradle 8.8+)
+//   2. allWarningsAsErrors = true (causes build failures with newer Kotlin/Gradle)
 
 const fs = require('fs');
 const path = require('path');
@@ -21,35 +21,80 @@ if (!fs.existsSync(target)) {
   process.exit(0);
 }
 
-let content = fs.readFileSync(target, 'utf8');
-const original = content;
+const fixedContent = `/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
 
-// 1. Remove the ModuleRegistry import line (handles LF and CRLF)
-content = content.replace(
-  /^import org\.gradle\.api\.internal\.classpath\.ModuleRegistry\r?\n/m,
-  ''
-);
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
-// 2. Remove the entire testRuntimeOnly(files(...)) block.
-//    Matches from "testRuntimeOnly(" to the closing ".first()))"
-//    [\s\S]*? matches any character including \r and \n (non-greedy)
-//    This handles both fresh files (serviceOf present) and partially patched files.
-content = content.replace(
-  /\r?\n[ \t]*testRuntimeOnly\([\s\S]*?\.first\(\)\)\)/,
-  ''
-);
-
-// 3. Safety net: if only the orphaned method chain remains (serviceOf already removed
-//    by a previous run but .getModule/.classpath/.asFiles/.first lines still there)
-content = content.replace(
-  /\r?\n[ \t]*\.getModule\([^\r\n]*\)\r?\n[ \t]*\.classpath\r?\n[ \t]*\.asFiles\r?\n[ \t]*\.first\(\)\)\)/,
-  ''
-);
-
-if (content !== original) {
-  // Preserve original line endings
-  fs.writeFileSync(target, content, 'utf8');
-  console.log('[patch-rngp] Patched successfully:', target);
-} else {
-  console.log('[patch-rngp] Already patched (OK).');
+plugins {
+  alias(libs.plugins.kotlin.jvm)
+  id("java-gradle-plugin")
 }
+
+repositories {
+  google()
+  mavenCentral()
+}
+
+gradlePlugin {
+  plugins {
+    create("react") {
+      id = "com.facebook.react"
+      implementationClass = "com.facebook.react.ReactPlugin"
+    }
+    create("reactrootproject") {
+      id = "com.facebook.react.rootproject"
+      implementationClass = "com.facebook.react.ReactRootProjectPlugin"
+    }
+  }
+}
+
+group = "com.facebook.react"
+
+dependencies {
+  implementation(gradleApi())
+
+  // The KGP/AGP version is defined by React Native Gradle plugin.
+  // Therefore we specify an implementation dep rather than a compileOnly.
+  implementation(libs.kotlin.gradle.plugin)
+  implementation(libs.android.gradle.plugin)
+
+  implementation(libs.gson)
+  implementation(libs.guava)
+  implementation(libs.javapoet)
+
+  testImplementation(libs.junit)
+}
+
+// We intentionally don't build for Java 17 as users will see a cryptic bytecode version
+// error first. Instead we produce a Java 11-compatible Gradle Plugin, so that AGP can print their
+// nice message showing that JDK 11 (or 17) is required first
+java { targetCompatibility = JavaVersion.VERSION_11 }
+
+kotlin { jvmToolchain(17) }
+
+tasks.withType<KotlinCompile>().configureEach {
+  kotlinOptions {
+    apiVersion = "1.5"
+    // See comment above on JDK 11 support
+    jvmTarget = "11"
+  }
+}
+
+tasks.withType<Test>().configureEach {
+  testLogging {
+    exceptionFormat = TestExceptionFormat.FULL
+    showExceptions = true
+    showCauses = true
+    showStackTraces = true
+  }
+}
+`;
+
+fs.writeFileSync(target, fixedContent, 'utf8');
+console.log('[patch-rngp] Patched successfully:', target);
