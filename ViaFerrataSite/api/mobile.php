@@ -401,4 +401,39 @@ if ($r0 === 'stats') {
     mok(['total_vias' => $total, 'countries' => $countries]);
 }
 
+// ── API root ─────────────────────────────────────────────────────────────────
+if ($r0 === '') {
+    mok([
+        'api'      => 'ViaFerrata-Monde Mobile API',
+        'version'  => '1.0',
+        'base_url' => '/mobile-api',
+        'endpoints' => [
+            'GET  /auth/me'               => 'Profil utilisateur connecté',
+            'POST /auth/login'            => 'Connexion → JWT',
+            'POST /auth/register'         => 'Inscription → JWT',
+            'GET  /vias'                  => 'Liste des vias (filtrée, paginée)',
+            'GET  /vias/top-rated'        => 'Vias les mieux notées',
+            'GET  /vias/map'              => 'Vias avec coordonnées GPS',
+            'GET  /vias/{slug}'           => 'Détail d\'une via',
+            'POST /vias/{slug}/rate'      => 'Noter une via',
+            'POST /vias/{slug}/comment'   => 'Commenter une via',
+            'GET  /favorites'             => 'Favoris de l\'utilisateur (auth)',
+            'POST /favorites'             => 'Ajouter un favori (auth)',
+            'DEL  /favorites/{via_id}'    => 'Supprimer un favori (auth)',
+            'GET  /logbook'               => 'Carnet de l\'utilisateur (auth)',
+            'POST /logbook'               => 'Ajouter une entrée carnet (auth)',
+            'DEL  /logbook/{id}'          => 'Supprimer une entrée carnet (auth)',
+            'GET  /trips'                 => 'Road trips de l\'utilisateur (auth)',
+            'POST /trips'                 => 'Créer un road trip (auth)',
+            'GET  /trips/{id}'            => 'Détail d\'un road trip (auth)',
+            'PATCH /trips/{id}'           => 'Modifier un road trip (auth)',
+            'DEL  /trips/{id}'            => 'Supprimer un road trip (auth)',
+            'POST /trips/{id}/vias'       => 'Ajouter une via au road trip (auth)',
+            'DEL  /trips/{id}/vias/{vid}' => 'Retirer une via du road trip (auth)',
+            'GET  /dashboard'             => 'Statistiques utilisateur (auth)',
+            'GET  /stats'                 => 'Statistiques globales',
+        ],
+    ]);
+}
+
 merr('Endpoint inconnu', 404);
