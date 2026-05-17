@@ -11,10 +11,22 @@ plugins {
     id("com.facebook.react.settings")
 }
 
-extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
-    ex.autolinkLibrariesFromCommand()
-}
-
 rootProject.name = 'ViaFerrataApp'
 include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')
+
+// Manual native library includes (replaces autolinkLibrariesFromCommand which fails on Windows)
+include ':async-storage'
+project(':async-storage').projectDir = new File('../node_modules/@react-native-async-storage/async-storage/android')
+
+include ':react-native-maps'
+project(':react-native-maps').projectDir = new File('../node_modules/react-native-maps/android')
+
+include ':react-native-screens'
+project(':react-native-screens').projectDir = new File('../node_modules/react-native-screens/android')
+
+include ':react-native-safe-area-context'
+project(':react-native-safe-area-context').projectDir = new File('../node_modules/react-native-safe-area-context/android')
+
+include ':react-native-vector-icons'
+project(':react-native-vector-icons').projectDir = new File('../node_modules/react-native-vector-icons/android')
