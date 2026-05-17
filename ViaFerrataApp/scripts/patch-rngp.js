@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 // Patches @react-native/gradle-plugin/build.gradle.kts to remove the
 // testRuntimeOnly block that uses serviceOf — an API removed in Gradle 8.8+.
-// RN 0.73.x ships RNGP that internally needs AGP 8.12 (requires Gradle 8.13+),
-// but also references serviceOf which was dropped in 8.8. This patch removes
-// the offending block so the plugin compiles with Gradle 8.13.
+// Handles both LF (Linux/Mac) and CRLF (Windows) line endings.
+// Also handles files already partially patched (serviceOf line gone but rest remains).
 
 const fs = require('fs');
 const path = require('path');
@@ -25,22 +24,32 @@ if (!fs.existsSync(target)) {
 let content = fs.readFileSync(target, 'utf8');
 const original = content;
 
-// Remove the ModuleRegistry import line
+// 1. Remove the ModuleRegistry import line (handles LF and CRLF)
 content = content.replace(
   /^import org\.gradle\.api\.internal\.classpath\.ModuleRegistry\r?\n/m,
   ''
 );
 
-// Remove the entire testRuntimeOnly(...) block that contains serviceOf
-// The block spans from "  testRuntimeOnly(" to the closing "))" line
+// 2. Remove the entire testRuntimeOnly(files(...)) block.
+//    Matches from "testRuntimeOnly(" to the closing ".first()))"
+//    [\s\S]*? matches any character including \r and \n (non-greedy)
+//    This handles both fresh files (serviceOf present) and partially patched files.
 content = content.replace(
-  /\n\s*testRuntimeOnly\(\s*\n\s*files\(\s*\n\s*serviceOf<ModuleRegistry>\(\)[\s\S]*?\.first\(\)\)\)/,
+  /\r?\n[ \t]*testRuntimeOnly\([\s\S]*?\.first\(\)\)\)/,
+  ''
+);
+
+// 3. Safety net: if only the orphaned method chain remains (serviceOf already removed
+//    by a previous run but .getModule/.classpath/.asFiles/.first lines still there)
+content = content.replace(
+  /\r?\n[ \t]*\.getModule\([^\r\n]*\)\r?\n[ \t]*\.classpath\r?\n[ \t]*\.asFiles\r?\n[ \t]*\.first\(\)\)\)/,
   ''
 );
 
 if (content !== original) {
+  // Preserve original line endings
   fs.writeFileSync(target, content, 'utf8');
   console.log('[patch-rngp] Patched successfully:', target);
 } else {
-  console.log('[patch-rngp] Already patched or pattern not found (OK).');
+  console.log('[patch-rngp] Already patched (OK).');
 }
