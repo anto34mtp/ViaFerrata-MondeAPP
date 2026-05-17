@@ -185,7 +185,25 @@ if (-not (Test-Path "node_modules")) {
 }
 Write-OK "Dependances npm OK."
 
-# 8. Gradle clean (optionnel)
+# 8. Patch RNGP (serviceOf supprime dans Gradle 8.8+)
+Write-Step "Patch compatibilite RNGP / Gradle 8.13"
+$RngpFile = Join-Path $AppDir "node_modules\@react-native\gradle-plugin\build.gradle.kts"
+if (Test-Path $RngpFile) {
+    $rngpContent = Get-Content $RngpFile -Raw -Encoding UTF8
+    $rngpPatched = $rngpContent `
+        -replace '(?m)^[^\r\n]*import\s+org\.gradle\.configurationcache\.extensions\.serviceOf[^\r\n]*\r?\n', '' `
+        -replace '(?m)^[^\r\n]*serviceOf<[^>]+>\(\)[^\r\n]*\r?\n', ''
+    if ($rngpPatched -ne $rngpContent) {
+        [System.IO.File]::WriteAllText($RngpFile, $rngpPatched, [System.Text.Encoding]::UTF8)
+        Write-OK "RNGP patche (serviceOf supprime)."
+    } else {
+        Write-OK "RNGP deja patche ou serviceOf absent."
+    }
+} else {
+    Write-Warn "Fichier RNGP introuvable -- node_modules absent ? Continuer..."
+}
+
+# 9. Gradle clean (optionnel)
 Write-Step "Nettoyage"
 $CleanInput = Read-Host "  Effectuer un gradle clean ? [O/n]"
 if ($CleanInput -eq "" -or $CleanInput -match "^[OoYy]") {
@@ -195,7 +213,7 @@ if ($CleanInput -eq "" -or $CleanInput -match "^[OoYy]") {
     Write-OK "Clean termine."
 }
 
-# 9. Build
+# 10. Build
 Write-Step "Compilation -- $Format ($Variant)"
 Set-Location $AndroidDir
 Write-Info "Tache Gradle : $GradleTask"
@@ -215,7 +233,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Fail "Gradle a echoue (code $LASTEXITCODE). Voir les logs ci-dessus."
 }
 
-# 10. Copie du fichier final
+# 11. Copie du fichier final
 Write-Step "Recuperation du fichier genere"
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
@@ -235,7 +253,7 @@ if (-not $Generated) { Write-Fail "Fichier genere introuvable." }
 Copy-Item $Generated.FullName -Destination $Dest
 $FileSize = [math]::Round((Get-Item $Dest).Length / 1MB, 1)
 
-# 11. Resume final
+# 12. Resume final
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Green
 Write-Host "  BUILD TERMINE AVEC SUCCES" -ForegroundColor Green
