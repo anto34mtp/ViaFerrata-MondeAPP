@@ -3,7 +3,26 @@
 -- À exécuter UNE SEULE FOIS sur la nouvelle base de données
 -- ============================================================
 
--- 1. Vue via_ratings_summary (nécessaire pour les pages favoris, dashboard, etc.)
+-- 1. Table ratings (MANQUANTE — nécessaire pour les notes et la carte)
+CREATE TABLE IF NOT EXISTS ratings (
+    id                 INT           NOT NULL AUTO_INCREMENT,
+    via_id             INT           NOT NULL,
+    user_id            INT,
+    visitor_hash       VARCHAR(64)   NOT NULL,
+    rating_general     DECIMAL(3,1)  NOT NULL,
+    rating_beauty      DECIMAL(3,1)  NOT NULL,
+    rating_difficulty  DECIMAL(3,1)  NOT NULL,
+    ip_address         VARCHAR(45),
+    created_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_via (via_id),
+    KEY idx_visitor (visitor_hash),
+    CONSTRAINT fk_r_via  FOREIGN KEY (via_id)   REFERENCES vias (id)  ON DELETE CASCADE,
+    CONSTRAINT fk_r_user FOREIGN KEY (user_id)  REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2. Vue via_ratings_summary (nécessaire pour les pages favoris, dashboard, etc.)
 CREATE OR REPLACE VIEW via_ratings_summary AS
 SELECT
     via_id,
