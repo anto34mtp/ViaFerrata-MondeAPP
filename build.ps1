@@ -175,8 +175,37 @@ if ($VariantInput -eq "2") {
 # 7. npm install
 Write-Step "Installation des dependances npm"
 Set-Location $AppDir
+
+# Verifier si les versions installees correspondent aux versions epinglees.
+# Si non, supprimer node_modules et reinstaller (evite les caches de versions trop neuves).
+$ExpectedVersions = @{
+    "react-native-maps"    = "1.10.3"
+    "react-native-screens" = "3.29.0"
+}
+$NeedsReinstall = $false
+if (Test-Path "node_modules") {
+    foreach ($pkg in $ExpectedVersions.Keys) {
+        $pkgJson = Join-Path $AppDir "node_modules\$pkg\package.json"
+        if (Test-Path $pkgJson) {
+            $installedVer = (Get-Content $pkgJson -Raw | ConvertFrom-Json).version
+            if ($installedVer -ne $ExpectedVersions[$pkg]) {
+                Write-Warn "Version incorrecte pour $pkg : $installedVer (attendu $($ExpectedVersions[$pkg]))"
+                $NeedsReinstall = $true
+            }
+        } else {
+            $NeedsReinstall = $true
+        }
+    }
+}
+
+if ($NeedsReinstall) {
+    Write-Warn "Suppression de node_modules pour reinstallation propre..."
+    Remove-Item -Recurse -Force "node_modules" -ErrorAction SilentlyContinue
+    if (Test-Path "package-lock.json") { Remove-Item -Force "package-lock.json" }
+}
+
 if (-not (Test-Path "node_modules")) {
-    Write-Info "Premiere installation..."
+    Write-Info "Installation des dependances..."
     & npm install --legacy-peer-deps
     if ($LASTEXITCODE -ne 0) { Write-Fail "npm install a echoue." }
 } else {
