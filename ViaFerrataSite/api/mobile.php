@@ -580,6 +580,30 @@ if ($r0 === 'stats') {
     }
 }
 
+// ── Diagnostic endpoint ──────────────────────────────────────────────────────
+if ($r0 === 'debug') {
+    $info = ['php' => PHP_VERSION, 'checks' => []];
+    try {
+        $db2 = Database::getInstance();
+        $info['checks']['db'] = 'ok';
+        try {
+            $cnt = $db2->fetchOne("SELECT COUNT(*) as c FROM vias WHERE is_active=1");
+            $info['checks']['vias_active'] = (int)($cnt['c'] ?? 0);
+        } catch (Throwable $e) { $info['checks']['vias_active'] = 'err: ' . $e->getMessage(); }
+        try {
+            $cnt2 = $db2->fetchOne("SELECT COUNT(*) as c FROM via_ratings_summary");
+            $info['checks']['via_ratings_summary'] = 'ok (' . ($cnt2['c'] ?? 0) . ' rows)';
+        } catch (Throwable $e) { $info['checks']['via_ratings_summary'] = 'MISSING: ' . $e->getMessage(); }
+        try {
+            $v = new ViaFerrata();
+            $rows = $v->search([], 2, 0);
+            $info['checks']['search'] = 'ok, returned ' . count($rows) . ' rows';
+            if (!empty($rows)) $info['checks']['search_sample_keys'] = array_keys($rows[0]);
+        } catch (Throwable $e) { $info['checks']['search'] = 'err: ' . $e->getMessage(); }
+    } catch (Throwable $e) { $info['checks']['db'] = 'err: ' . $e->getMessage(); }
+    mok($info);
+}
+
 // ── API root ─────────────────────────────────────────────────────────────────
 if ($r0 === '') {
     mok([

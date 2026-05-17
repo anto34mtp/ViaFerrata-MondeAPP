@@ -30,6 +30,7 @@ const CatalogScreen: React.FC = () => {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [apiError, setApiError] = useState<string>('');
 
   // Filters
   const [search, setSearch] = useState('');
@@ -53,6 +54,7 @@ const CatalogScreen: React.FC = () => {
     async (p: number, reset = false) => {
       setLoading(true);
       try {
+        setApiError('');
         const res = await getVias({
           page: p,
           limit: 20,
@@ -73,8 +75,10 @@ const CatalogScreen: React.FC = () => {
         }
         setTotal(tot);
         setHasMore(data.length === 20);
-      } catch {
-        // silent
+      } catch (err: any) {
+        const status = err?.response?.status;
+        const msg = err?.response?.data?.msg || err?.message || 'Erreur réseau';
+        setApiError(`HTTP ${status ?? '?'} — ${msg}`);
       } finally {
         setLoading(false);
       }
@@ -165,6 +169,9 @@ const CatalogScreen: React.FC = () => {
       <Text style={styles.resultCount}>
         {total} {t.catalog.results}
       </Text>
+      {apiError ? (
+        <Text style={styles.apiError}>⚠️ {apiError}</Text>
+      ) : null}
 
       <FlatList
         data={vias}
@@ -331,6 +338,16 @@ const styles = StyleSheet.create({
     padding: 32,
     color: '#999',
     fontSize: 15,
+  },
+  apiError: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    padding: 10,
+    backgroundColor: '#FFF3CD',
+    borderRadius: 8,
+    fontSize: 12,
+    color: '#856404',
+    fontFamily: 'monospace',
   },
   modal: {
     flex: 1,
