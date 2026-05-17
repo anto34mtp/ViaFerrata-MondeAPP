@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
   title: {fontSize: 24, fontWeight: 'bold', color: '#333', marginBottom: 4},
   subtitle: {color: '#666', fontSize: 14, marginBottom: 20},
   label: {fontSize: 13, color: '#555', marginBottom: 4, marginTop: 12, fontWeight: '500'},
-  input: {borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, fontSize: 15, backgroundColor: '#fff'},
+  input: {borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, fontSize: 15, backgroundColor: '#fff', color: '#1A1A1A'},
   textarea: {height: 100, textAlignVertical: 'top'},
   row: {flexDirection: 'row', gap: 12},
   half: {flex: 1},

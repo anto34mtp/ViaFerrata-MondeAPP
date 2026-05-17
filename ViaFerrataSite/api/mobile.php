@@ -163,7 +163,22 @@ if ($r0 === 'vias') {
             $rows = $viaModel->getTopRated($limit);
             mok(array_map('normalizeVia', $rows));
         } catch (Throwable $e) {
-            mok([]);
+            // Fallback without via_ratings_summary view — just return recent vias
+            try {
+                $db = Database::getInstance();
+                $stmt = $db->getConnection()->prepare(
+                    "SELECT v.*, d.name as department_name, d.code as department_code
+                     FROM vias v
+                     LEFT JOIN departments d ON v.department_id = d.code
+                     WHERE v.is_active = 1
+                     ORDER BY v.created_at DESC LIMIT :limit"
+                );
+                $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+                $stmt->execute();
+                mok(array_map('normalizeVia', $stmt->fetchAll()));
+            } catch (Throwable $e2) {
+                mok([]);
+            }
         }
     }
 
@@ -171,19 +186,34 @@ if ($r0 === 'vias') {
     if ($r1 === 'map' && $method === 'GET') {
         try {
             $db = Database::getInstance();
+            // Try with ratings view first
             $rows = $db->fetchAll(
                 "SELECT v.id, v.name, v.slug, v.latitude, v.longitude, v.difficulty, v.country,
                         v.image_url, d.name as department_name, vrs.avg_overall
                  FROM vias v
                  LEFT JOIN departments d ON v.department_id = d.code
                  LEFT JOIN via_ratings_summary vrs ON v.id = vrs.via_id
-                 WHERE v.is_active = 1 AND v.is_approved = 1
+                 WHERE v.is_active = 1
                    AND v.latitude IS NOT NULL AND v.longitude IS NOT NULL
                    AND v.latitude != 0 AND v.longitude != 0
                  ORDER BY v.name ASC"
             );
         } catch (Throwable $e) {
-            $rows = [];
+            // Fallback without ratings view
+            try {
+                $rows = $db->fetchAll(
+                    "SELECT v.id, v.name, v.slug, v.latitude, v.longitude, v.difficulty, v.country,
+                            v.image_url, d.name as department_name, NULL as avg_overall
+                     FROM vias v
+                     LEFT JOIN departments d ON v.department_id = d.code
+                     WHERE v.is_active = 1
+                       AND v.latitude IS NOT NULL AND v.longitude IS NOT NULL
+                       AND v.latitude != 0 AND v.longitude != 0
+                     ORDER BY v.name ASC"
+                );
+            } catch (Throwable $e2) {
+                $rows = [];
+            }
         }
         $points = [];
         foreach ($rows as $r) {
@@ -217,10 +247,45 @@ if ($r0 === 'vias') {
 
         try {
             $total = $viaModel->count($filters);
+        } catch (Throwable $e) {
+            $total = 0;
+        }
+        try {
             $items = $viaModel->search($filters, $limit, $offset);
             mok(['items' => array_map('normalizeVia', $items), 'total' => $total, 'page' => $page, 'limit' => $limit]);
         } catch (Throwable $e) {
-            mok(['items' => [], 'total' => 0, 'page' => $page, 'limit' => $limit]);
+            // Fallback: simple query without via_ratings_summary view
+            try {
+                $db = Database::getInstance();
+                $simpleConditions = ["v.is_active = 1"];
+                $simpleParams = [];
+                if (!empty($filters['search'])) {
+                    $s = '%' . $filters['search'] . '%';
+                    $simpleConditions[] = "(v.name LIKE :s_name OR v.location LIKE :s_loc)";
+                    $simpleParams[':s_name'] = $s;
+                    $simpleParams[':s_loc']  = $s;
+                }
+                if (!empty($filters['country']))       $simpleConditions[] = "v.country = :country";
+                if (!empty($filters['country']))       $simpleParams[':country'] = $filters['country'];
+                if (isset($filters['difficulty_min'])) { $simpleConditions[] = "v.difficulty >= :dmin"; $simpleParams[':dmin'] = $filters['difficulty_min']; }
+                if (isset($filters['difficulty_max'])) { $simpleConditions[] = "v.difficulty <= :dmax"; $simpleParams[':dmax'] = $filters['difficulty_max']; }
+                $where = implode(' AND ', $simpleConditions);
+                $stmt = $db->getConnection()->prepare(
+                    "SELECT v.*, d.name as department_name, d.code as department_code
+                     FROM vias v
+                     LEFT JOIN departments d ON v.department_id = d.code
+                     WHERE $where ORDER BY v.created_at DESC LIMIT :limit OFFSET :offset"
+                );
+                foreach ($simpleParams as $k => $val) { $stmt->bindValue($k, $val); }
+                $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+                $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+                $stmt->execute();
+                $items = $stmt->fetchAll();
+                if ($total === 0) $total = count($items);
+                mok(['items' => array_map('normalizeVia', $items), 'total' => $total, 'page' => $page, 'limit' => $limit]);
+            } catch (Throwable $e2) {
+                mok(['items' => [], 'total' => 0, 'page' => $page, 'limit' => $limit]);
+            }
         }
     }
 

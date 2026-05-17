@@ -309,6 +309,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     borderWidth: 1,
     borderColor: '#E0E0E0',
+    color: '#1A1A1A',
   },
   filterBtn: {
     marginLeft: 10,
@@ -369,6 +370,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 15,
+    color: '#1A1A1A',
+    backgroundColor: '#FFFFFF',
   },
   diffRow: {
     flexDirection: 'row',
