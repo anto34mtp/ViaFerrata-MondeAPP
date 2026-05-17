@@ -15,6 +15,13 @@ header('Access-Control-Allow-Headers: Authorization, Content-Type');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
+// Catch any uncaught exception/error and return JSON instead of HTML error page
+set_exception_handler(function (Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'msg' => 'Erreur serveur', 'debug' => ENVIRONMENT === 'development' ? $e->getMessage() : null]);
+    exit;
+});
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function mok(mixed $data = null, int $code = 200): void {
     http_response_code($code);
@@ -397,7 +404,7 @@ if ($r0 === 'dashboard') {
 if ($r0 === 'stats') {
     $db = Database::getInstance();
     $total = (int)$db->fetchOne("SELECT COUNT(*) AS c FROM vias WHERE is_active=1 AND is_approved=1")['c'];
-    $countries = $db->fetchAll("SELECT country, COUNT(*) AS count FROM vias WHERE is_active=1 AND is_approved=1 AND country IS NOT NULL GROUP BY country ORDER BY count DESC") ?: [];
+    $countries = (int)$db->fetchOne("SELECT COUNT(DISTINCT country) AS c FROM vias WHERE is_active=1 AND is_approved=1 AND country IS NOT NULL")['c'];
     mok(['total_vias' => $total, 'countries' => $countries]);
 }
 

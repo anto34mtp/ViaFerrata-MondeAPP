@@ -94,7 +94,7 @@ export default function SettingsScreen() {
             <MenuItem icon="🚀" label={t('nav.trips')} onPress={() => navigation.navigate('Main' as any)} />
           </>
         )}
-        <MenuItem icon="➕" label={t('submit.title')} onPress={() => (navigation as any).navigate('SubmitVia')} />
+        <MenuItem icon="➕" label={t('submit.title')} onPress={() => navigation.navigate('SubmitVia')} />
       </View>
 
       {/* Logout */}

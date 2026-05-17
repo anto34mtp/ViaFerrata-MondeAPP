@@ -63,8 +63,9 @@ const CatalogScreen: React.FC = () => {
           difficulty_max: diffMax,
           order_by: orderBy,
         });
-        const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
-        const tot = (res.data as any)?.total || data.length;
+        const body = res.data as any;
+        const data: Via[] = Array.isArray(body) ? body : body?.items || [];
+        const tot: number = body?.total ?? data.length;
         if (reset) {
           setVias(data);
         } else {

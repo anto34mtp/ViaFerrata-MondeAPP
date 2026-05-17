@@ -10,6 +10,15 @@ export const apiClient = axios.create({
   },
 });
 
+// Unwrap the { ok: true, data: ... } envelope returned by every mok() call
+apiClient.interceptors.response.use((response) => {
+  const body = response.data;
+  if (body && typeof body === 'object' && 'ok' in body && 'data' in body) {
+    response.data = body.data;
+  }
+  return response;
+});
+
 // ─── Via types ────────────────────────────────────────────────────────────────
 
 export interface Via {

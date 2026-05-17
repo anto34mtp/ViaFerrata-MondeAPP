@@ -27,6 +27,7 @@ export type RootStackParamList = {
   Register: undefined;
   RoadTripDetail: {id: number};
   RoadTripCreate: undefined;
+  SubmitVia: undefined;
 };
 
 export type TabParamList = {
@@ -93,6 +94,7 @@ export default function AppNavigator() {
       <Stack.Screen name="Register" component={RegisterScreen} options={{title: 'Inscription'}} />
       <Stack.Screen name="RoadTripDetail" component={RoadTripDetailScreen} options={{title: 'Road Trip'}} />
       <Stack.Screen name="RoadTripCreate" component={RoadTripCreateScreen} options={{title: 'Nouveau Road Trip'}} />
+      <Stack.Screen name="SubmitVia" component={SubmitViaScreen} options={{title: 'Proposer une via'}} />
     </Stack.Navigator>
   );
 }

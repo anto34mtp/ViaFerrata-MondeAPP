@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
-  Alert,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {getTopRatedVias, getStats, getVias, Via, Stats} from '../api/client';
@@ -30,15 +29,12 @@ const HomeScreen: React.FC = () => {
         getVias({page: 1, limit: 6, order_by: 'recent'}),
         getStats(),
       ]);
-      setTopRated(topRes.data || []);
-      setLatest(
-        Array.isArray(latestRes.data)
-          ? latestRes.data
-          : latestRes.data?.data || [],
-      );
+      setTopRated(Array.isArray(topRes.data) ? topRes.data : []);
+      const latestBody = latestRes.data as any;
+      setLatest(Array.isArray(latestBody) ? latestBody : latestBody?.items || []);
       setStats(statsRes.data);
-    } catch (e) {
-      Alert.alert(t.common.error, String(e));
+    } catch {
+      // API error — don't block the UI, empty state is shown instead
     } finally {
       setLoading(false);
       setRefreshing(false);
