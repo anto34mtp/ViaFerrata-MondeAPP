@@ -1,15 +1,9 @@
 pluginManagement {
+    includeBuild("../node_modules/@react-native/gradle-plugin")
     repositories {
-        gradlePluginPortal()
         google()
         mavenCentral()
-    }
-    resolutionStrategy {
-        eachPlugin {
-            if (requested.id.id.startsWith("com.facebook.react")) {
-                useModule("com.facebook.react:react-native-gradle-plugin:0.73.9")
-            }
-        }
+        gradlePluginPortal()
     }
 }
 
@@ -23,3 +17,4 @@ extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
 
 rootProject.name = 'ViaFerrataApp'
 include ':app'
+includeBuild('../node_modules/@react-native/gradle-plugin')
