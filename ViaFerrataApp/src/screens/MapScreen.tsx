@@ -19,7 +19,11 @@ const MapScreen: React.FC = () => {
 
   useEffect(() => {
     getMapVias()
-      .then(res => setPoints(Array.isArray(res.data) ? res.data : []))
+      .then(res => {
+        const raw = res.data as any;
+        const body = (raw && typeof raw === 'object' && 'ok' in raw && 'data' in raw) ? raw.data : raw;
+        setPoints(Array.isArray(body) ? body : []);
+      })
       .catch(() => setPoints([]))
       .finally(() => setHtmlReady(true));
   }, []);

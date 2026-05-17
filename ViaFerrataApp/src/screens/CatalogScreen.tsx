@@ -58,15 +58,16 @@ const CatalogScreen: React.FC = () => {
         const res = await getVias({
           page: p,
           limit: 20,
-          search,
-          country,
-          department_code: departmentCode,
-          difficulty_min: diffMin,
-          difficulty_max: diffMax,
-          order_by: orderBy,
+          search: search || undefined,
+          country: country || undefined,
+          department_code: departmentCode || undefined,
+          difficulty_min: diffMin || undefined,
+          difficulty_max: diffMax || undefined,
+          order_by: orderBy || undefined,
         });
-        const body = res.data as any;
-        const data: Via[] = Array.isArray(body) ? body : body?.items || [];
+        const raw = res.data as any;
+        const body = (raw && typeof raw === 'object' && 'ok' in raw && 'data' in raw) ? raw.data : raw;
+        const data: Via[] = Array.isArray(body) ? body : (body?.items || body?.data || []);
         const tot: number = body?.total ?? data.length;
         if (reset) {
           setVias(data);

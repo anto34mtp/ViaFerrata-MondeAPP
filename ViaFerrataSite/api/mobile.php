@@ -25,7 +25,12 @@ set_exception_handler(function (Throwable $e) {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function mok(mixed $data = null, int $code = 200): void {
     http_response_code($code);
-    echo json_encode(['ok' => true, 'data' => $data]);
+    $flags = JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE;
+    $json  = json_encode(['ok' => true, 'data' => $data], $flags);
+    if ($json === false) {
+        $json = json_encode(['ok' => true, 'data' => $data], $flags | JSON_PARTIAL_OUTPUT_ON_ERROR);
+    }
+    echo $json;
     exit;
 }
 function merr(string $msg, int $code = 400): void {
@@ -64,7 +69,7 @@ function normalizeVia(array $v): array {
         'location'              => $v['location'] ?? null,
         'department_name'       => $v['department_name'] ?? null,
         'department_code'       => $v['department_code'] ?? null,
-        'country'               => $v['country'] ?? null,
+        'country'               => $v['code_pays'] ?? $v['country'] ?? null,
         'difficulty'            => isset($v['difficulty']) && $v['difficulty'] !== null ? (int)$v['difficulty'] : null,
         'duration_min'          => isset($v['duration_hours']) && $v['duration_hours'] !== null ? (int)$v['duration_hours'] : null,
         'length_m'              => isset($v['length_meters']) && $v['length_meters'] !== null ? (int)$v['length_meters'] : null,
@@ -163,9 +168,7 @@ if ($r0 === 'vias') {
             $rows = $viaModel->getTopRated($limit);
             mok(array_map('normalizeVia', $rows));
         } catch (Throwable $e) {
-            // Fallback without via_ratings_summary view — just return recent vias
             try {
-                $db = Database::getInstance();
                 $stmt = $db->getConnection()->prepare(
                     "SELECT v.*, d.name as department_name, d.code as department_code
                      FROM vias v
@@ -185,10 +188,8 @@ if ($r0 === 'vias') {
     // Endpoint carte : toutes les vias avec coordonnées GPS
     if ($r1 === 'map' && $method === 'GET') {
         try {
-            $db = Database::getInstance();
-            // Try with ratings view first
             $rows = $db->fetchAll(
-                "SELECT v.id, v.name, v.slug, v.latitude, v.longitude, v.difficulty, v.country,
+                "SELECT v.id, v.name, v.slug, v.latitude, v.longitude, v.difficulty, v.code_pays as country,
                         v.image_url, d.name as department_name, vrs.avg_overall
                  FROM vias v
                  LEFT JOIN departments d ON v.department_id = d.code
@@ -199,10 +200,9 @@ if ($r0 === 'vias') {
                  ORDER BY v.name ASC"
             );
         } catch (Throwable $e) {
-            // Fallback without ratings view
             try {
                 $rows = $db->fetchAll(
-                    "SELECT v.id, v.name, v.slug, v.latitude, v.longitude, v.difficulty, v.country,
+                    "SELECT v.id, v.name, v.slug, v.latitude, v.longitude, v.difficulty, v.code_pays as country,
                             v.image_url, d.name as department_name, NULL as avg_overall
                      FROM vias v
                      LEFT JOIN departments d ON v.department_id = d.code
@@ -241,8 +241,8 @@ if ($r0 === 'vias') {
         if (!empty($_GET['search']))          $filters['search']          = $_GET['search'];
         if (!empty($_GET['department_code'])) $filters['department_code'] = $_GET['department_code'];
         if (!empty($_GET['country']))         $filters['country']         = $_GET['country'];
-        if (isset($_GET['difficulty_min']))   $filters['difficulty_min']  = (int)$_GET['difficulty_min'];
-        if (isset($_GET['difficulty_max']))   $filters['difficulty_max']  = (int)$_GET['difficulty_max'];
+        if (!empty($_GET['difficulty_min']))  $filters['difficulty_min']  = (int)$_GET['difficulty_min'];
+        if (!empty($_GET['difficulty_max']))  $filters['difficulty_max']  = (int)$_GET['difficulty_max'];
         if (!empty($_GET['order_by']))        $filters['order_by']        = $_GET['order_by'];
 
         try {
@@ -256,7 +256,6 @@ if ($r0 === 'vias') {
         } catch (Throwable $e) {
             // Fallback: simple query without via_ratings_summary view
             try {
-                $db = Database::getInstance();
                 $simpleConditions = ["v.is_active = 1"];
                 $simpleParams = [];
                 if (!empty($filters['search'])) {
@@ -265,8 +264,10 @@ if ($r0 === 'vias') {
                     $simpleParams[':s_name'] = $s;
                     $simpleParams[':s_loc']  = $s;
                 }
-                if (!empty($filters['country']))       $simpleConditions[] = "v.country = :country";
-                if (!empty($filters['country']))       $simpleParams[':country'] = $filters['country'];
+                if (!empty($filters['country'])) {
+                    $simpleConditions[] = "v.code_pays = :country";
+                    $simpleParams[':country'] = $filters['country'];
+                }
                 if (isset($filters['difficulty_min'])) { $simpleConditions[] = "v.difficulty >= :dmin"; $simpleParams[':dmin'] = $filters['difficulty_min']; }
                 if (isset($filters['difficulty_max'])) { $simpleConditions[] = "v.difficulty <= :dmax"; $simpleParams[':dmax'] = $filters['difficulty_max']; }
                 $where = implode(' AND ', $simpleConditions);
@@ -502,25 +503,15 @@ if ($r0 === 'dashboard') {
     $favModel  = new Favorite();
     $logModel  = new Logbook();
     $tripModel = new RoadTrip();
-    $viaModel  = new ViaFerrata();
 
-    try { $favCount    = $favModel->countByUser($uid); }          catch (Throwable $e) { $favCount = 0; }
-    try { $todoCount   = $favModel->countByUser($uid, 'to_do'); } catch (Throwable $e) { $todoCount = 0; }
-    try { $doneCount   = $favModel->countByUser($uid, 'done'); }  catch (Throwable $e) { $doneCount = 0; }
-    try { $logCount    = $logModel->countByUser($uid); }          catch (Throwable $e) { $logCount = 0; }
-    try { $logYear     = $logModel->countThisYear($uid); }        catch (Throwable $e) { $logYear = 0; }
-    try { $trips       = $tripModel->getByUser($uid); }           catch (Throwable $e) { $trips = []; }
-    try { $recentFavs  = $favModel->getByUser($uid, null); }      catch (Throwable $e) { $recentFavs = []; }
-    try { $recentLog   = $logModel->getByUser($uid); }            catch (Throwable $e) { $recentLog = []; }
-
-    // Favorite::getByUser() does SELECT f.*, v.* so v.id overwrites f.id.
-    // Restructure to expose the nested via object the app expects.
+    // Flatten favorites rows → nested {via: {name, slug}} for app
+    $recentFavs = $favModel->getByUser($uid, null);
     $recentFavsFormatted = array_map(function($f) {
         return [
-            'id'         => (int)($f['via_id'] ?? 0),
+            'id'         => (int)($f['via_id'] ?? $f['id'] ?? 0),
             'via_id'     => (int)($f['via_id'] ?? 0),
             'status'     => $f['status'] ?? 'to_do',
-            'created_at' => $f['updated_at'] ?? '',
+            'created_at' => $f['updated_at'] ?? $f['created_at'] ?? '',
             'via' => [
                 'id'   => (int)($f['via_id'] ?? 0),
                 'name' => $f['name'] ?? ('Via #' . ($f['via_id'] ?? '?')),
@@ -529,7 +520,8 @@ if ($r0 === 'dashboard') {
         ];
     }, array_slice($recentFavs, 0, 5));
 
-    // Logbook::getByUser() selects v.name AS via_name, v.slug AS via_slug explicitly.
+    // Flatten logbook rows → nested {via: {name, slug}} for app
+    $recentLog = $logModel->getByUser($uid);
     $recentLogFormatted = array_map(function($l) {
         return [
             'id'         => (int)($l['id'] ?? 0),
@@ -540,102 +532,75 @@ if ($r0 === 'dashboard') {
             'notes'      => $l['notes'] ?? null,
             'via' => [
                 'id'   => (int)($l['via_id'] ?? 0),
-                'name' => $l['via_name'] ?? ('Via #' . ($l['via_id'] ?? '?')),
-                'slug' => $l['via_slug'] ?? '',
+                'name' => $l['via_name'] ?? $l['name'] ?? ('Via #' . ($l['via_id'] ?? '?')),
+                'slug' => $l['via_slug'] ?? $l['slug'] ?? '',
             ],
         ];
     }, array_slice($recentLog, 0, 5));
 
     mok([
         'stats' => [
-            'favorites_count'  => $favCount,
-            'to_do_count'      => $todoCount,
-            'done_count'       => $doneCount,
-            'logbook_count'    => $logCount,
-            'logbook_this_year'=> $logYear,
-            'trips_count'      => count($trips),
+            'favorites_count'   => $favModel->countByUser($uid),
+            'to_do_count'       => $favModel->countByUser($uid, 'to_do'),
+            'done_count'        => $favModel->countByUser($uid, 'done'),
+            'logbook_count'     => $logModel->countByUser($uid),
+            'logbook_this_year' => $logModel->countThisYear($uid),
+            'trips_count'       => count($tripModel->getByUser($uid)),
         ],
         'recent_favorites' => $recentFavsFormatted,
         'recent_logbook'   => $recentLogFormatted,
-        'trips'            => $trips,
+        'trips'            => $tripModel->getByUser($uid),
     ]);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SUBMIT  (public — via proposal)
+// ═══════════════════════════════════════════════════════════════════
+if ($r0 === 'submit' && $method === 'POST') {
+    $b = body();
+    $name     = trim($b['name'] ?? '');
+    $location = trim($b['location'] ?? '');
+    if (!$name || !$location) merr('Nom et localisation requis');
+
+    $db = Database::getInstance();
+    $db->insert(
+        "INSERT INTO vias (name, location, latitude, longitude, difficulty, duration_hours,
+                           approach_time, return_time, elevation_gain, description,
+                           submitted_by, is_active, is_approved, created_at, updated_at)
+         VALUES (:name,:location,:lat,:lng,:diff,:dur,:app,:ret,:elev,:desc,:email,0,0,NOW(),NOW())",
+        [
+            ':name'     => $name,
+            ':location' => $location,
+            ':lat'      => isset($b['latitude'])      ? (float)$b['latitude']      : null,
+            ':lng'      => isset($b['longitude'])     ? (float)$b['longitude']     : null,
+            ':diff'     => isset($b['difficulty'])    ? (int)$b['difficulty']      : null,
+            ':dur'      => isset($b['duration_hours'])? (float)$b['duration_hours']: null,
+            ':app'      => isset($b['approach_time']) ? (int)$b['approach_time']   : null,
+            ':ret'      => isset($b['return_time'])   ? (int)$b['return_time']     : null,
+            ':elev'     => isset($b['elevation_gain'])? (int)$b['elevation_gain']  : null,
+            ':desc'     => trim($b['description'] ?? '') ?: null,
+            ':email'    => trim($b['author_email'] ?? '') ?: null,
+        ]
+    );
+    mok(['submitted' => true], 201);
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // COUNTRIES / STATS  (public)
 // ═══════════════════════════════════════════════════════════════════
 if ($r0 === 'stats') {
-    try {
-        $db = Database::getInstance();
-        $total = (int)($db->fetchOne("SELECT COUNT(*) AS c FROM vias WHERE is_active=1 AND is_approved=1")['c'] ?? 0);
-        // country peut ne pas exister sur certaines installations — on tente, sinon 0
-        try {
-            $countries = (int)($db->fetchOne("SELECT COUNT(DISTINCT country) AS c FROM vias WHERE is_active=1 AND is_approved=1 AND country IS NOT NULL")['c'] ?? 0);
-        } catch (Throwable $e) {
-            $countries = 0;
-        }
-        mok(['total_vias' => $total, 'countries' => $countries]);
-    } catch (Throwable $e) {
-        mok(['total_vias' => 0, 'countries' => 0]);
-    }
-}
-
-// ── Diagnostic endpoint ──────────────────────────────────────────────────────
-if ($r0 === 'debug') {
-    $info = ['php' => PHP_VERSION, 'checks' => []];
-    try {
-        $db2 = Database::getInstance();
-        $info['checks']['db'] = 'ok';
-        try {
-            $cnt = $db2->fetchOne("SELECT COUNT(*) as c FROM vias WHERE is_active=1");
-            $info['checks']['vias_active'] = (int)($cnt['c'] ?? 0);
-        } catch (Throwable $e) { $info['checks']['vias_active'] = 'err: ' . $e->getMessage(); }
-        try {
-            $cnt2 = $db2->fetchOne("SELECT COUNT(*) as c FROM via_ratings_summary");
-            $info['checks']['via_ratings_summary'] = 'ok (' . ($cnt2['c'] ?? 0) . ' rows)';
-        } catch (Throwable $e) { $info['checks']['via_ratings_summary'] = 'MISSING: ' . $e->getMessage(); }
-        try {
-            $v = new ViaFerrata();
-            $rows = $v->search([], 2, 0);
-            $info['checks']['search'] = 'ok, returned ' . count($rows) . ' rows';
-            if (!empty($rows)) $info['checks']['search_sample_keys'] = array_keys($rows[0]);
-        } catch (Throwable $e) { $info['checks']['search'] = 'err: ' . $e->getMessage(); }
-    } catch (Throwable $e) { $info['checks']['db'] = 'err: ' . $e->getMessage(); }
-    mok($info);
+    $db = Database::getInstance();
+    $total     = (int)($db->fetchOne("SELECT COUNT(*) AS c FROM vias WHERE is_active=1")['c'] ?? 0);
+    $countries = $db->fetchAll("SELECT code_pays as country, COUNT(*) AS count FROM vias WHERE is_active=1 AND code_pays IS NOT NULL AND code_pays != '' GROUP BY code_pays ORDER BY count DESC") ?: [];
+    mok(['total_vias' => $total, 'countries' => count($countries)]);
 }
 
 // ── API root ─────────────────────────────────────────────────────────────────
 if ($r0 === '') {
     mok([
         'api'      => 'ViaFerrata-Monde Mobile API',
-        'version'  => '1.0',
+        'version'  => '1.1',
         'base_url' => '/mobile-api',
-        'endpoints' => [
-            'GET  /auth/me'               => 'Profil utilisateur connecté',
-            'POST /auth/login'            => 'Connexion → JWT',
-            'POST /auth/register'         => 'Inscription → JWT',
-            'GET  /vias'                  => 'Liste des vias (filtrée, paginée)',
-            'GET  /vias/top-rated'        => 'Vias les mieux notées',
-            'GET  /vias/map'              => 'Vias avec coordonnées GPS',
-            'GET  /vias/{slug}'           => 'Détail d\'une via',
-            'POST /vias/{slug}/rate'      => 'Noter une via',
-            'POST /vias/{slug}/comment'   => 'Commenter une via',
-            'GET  /favorites'             => 'Favoris de l\'utilisateur (auth)',
-            'POST /favorites'             => 'Ajouter un favori (auth)',
-            'DEL  /favorites/{via_id}'    => 'Supprimer un favori (auth)',
-            'GET  /logbook'               => 'Carnet de l\'utilisateur (auth)',
-            'POST /logbook'               => 'Ajouter une entrée carnet (auth)',
-            'DEL  /logbook/{id}'          => 'Supprimer une entrée carnet (auth)',
-            'GET  /trips'                 => 'Road trips de l\'utilisateur (auth)',
-            'POST /trips'                 => 'Créer un road trip (auth)',
-            'GET  /trips/{id}'            => 'Détail d\'un road trip (auth)',
-            'PATCH /trips/{id}'           => 'Modifier un road trip (auth)',
-            'DEL  /trips/{id}'            => 'Supprimer un road trip (auth)',
-            'POST /trips/{id}/vias'       => 'Ajouter une via au road trip (auth)',
-            'DEL  /trips/{id}/vias/{vid}' => 'Retirer une via du road trip (auth)',
-            'GET  /dashboard'             => 'Statistiques utilisateur (auth)',
-            'GET  /stats'                 => 'Statistiques globales',
-        ],
     ]);
 }
 
