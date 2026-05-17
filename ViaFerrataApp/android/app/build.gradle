@@ -2,11 +2,11 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
-// PackageList.kt is provided manually — disable the autolinking generation task
-// that fails on Windows because react-native config cannot resolve packageName.
+// Disable RNGP tasks that call react-native config (fails on Windows — packageName not resolved)
 gradle.projectsEvaluated {
     tasks.configureEach { task ->
-        if (task.name.contains("generateAutolinkingPackageList")) {
+        if (task.name.contains("generateAutolinkingPackageList") ||
+            task.name.contains("generateReactNativeEntryPoint")) {
             task.enabled = false
         }
     }
