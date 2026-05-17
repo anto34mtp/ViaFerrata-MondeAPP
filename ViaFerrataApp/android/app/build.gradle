@@ -2,12 +2,6 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
-react {
-    // Forcer l'inclusion du bundle JS dans les deux variantes
-    // (sinon Debug demande Metro, ce qui n'est pas pratique pour distribuer)
-    bundleInDebug = true
-    bundleInRelease = true
-}
 
 def enableProguardInReleaseBuilds = true
 

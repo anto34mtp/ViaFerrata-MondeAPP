@@ -224,7 +224,23 @@ if (Test-Path $PatchScript) {
     Write-Warn "Script de patch introuvable : $PatchScript"
 }
 
-# 9. Gradle clean (optionnel)
+# 9. Pre-generation du bundle JS (evite "Unable to load script" sur Debug et Release)
+Write-Step "Generation du bundle JS"
+$AssetsDir = Join-Path $AndroidDir "app\src\main\assets"
+New-Item -ItemType Directory -Path $AssetsDir -Force | Out-Null
+$DevMode = if ($Variant -eq "debug") { "true" } else { "false" }
+Set-Location $AppDir
+Write-Info "npx react-native bundle --dev $DevMode ..."
+& npx react-native bundle `
+    --platform android `
+    --dev $DevMode `
+    --entry-file index.js `
+    --bundle-output "$AssetsDir\index.android.bundle" `
+    --assets-dest "$AndroidDir\app\src\main\res"
+if ($LASTEXITCODE -ne 0) { Write-Fail "Echec de la generation du bundle JS." }
+Write-OK "Bundle JS genere : $AssetsDir\index.android.bundle"
+
+# 11. Gradle clean (optionnel)
 Write-Step "Nettoyage"
 $CleanInput = Read-Host "  Effectuer un gradle clean ? [O/n]"
 if ($CleanInput -eq "" -or $CleanInput -match "^[OoYy]") {
@@ -234,7 +250,7 @@ if ($CleanInput -eq "" -or $CleanInput -match "^[OoYy]") {
     Write-OK "Clean termine."
 }
 
-# 10. Build
+# 12. Build
 Write-Step "Compilation -- $Format ($Variant)"
 Set-Location $AndroidDir
 Write-Info "Tache Gradle : $GradleTask"
@@ -256,7 +272,7 @@ $GradleExit = $LASTEXITCODE
 # gradlew.bat sur Windows peut retourner 1 meme en cas de succes (bug connu).
 # On verifie donc l'existence du fichier genere plutot que le code de retour.
 
-# 11. Copie du fichier final
+# 13. Copie du fichier final
 Write-Step "Recuperation du fichier genere"
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
@@ -271,16 +287,16 @@ if ($Format -eq "APK") {
     $Dest = Join-Path $OutputDir "ViaFerrata_${Timestamp}.aab"
 }
 
-if (-not $Generated) {
-    # Le fichier n'existe pas => le build a vraiment echoue
-    Write-Fail "Build echoue (code Gradle: $GradleExit) -- aucun fichier genere. Voir les logs ci-dessus."
+if (-not $Generated -or $Generated.LastWriteTime -lt $BuildStart) {
+    # Aucun fichier recent => le build a echoue (le fichier trouve est un ancien build)
+    Write-Fail "Build echoue (code Gradle: $GradleExit) -- aucun fichier recent genere. Voir les logs ci-dessus."
 }
-# Si le fichier existe, le build a reussi meme si gradlew.bat a retourne un code non-zero
+# Le fichier est plus recent que le debut du build => succes reel
 
 Copy-Item $Generated.FullName -Destination $Dest
 $FileSize = [math]::Round((Get-Item $Dest).Length / 1MB, 1)
 
-# 12. Resume final
+# 14. Resume final
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Green
 Write-Host "  BUILD TERMINE AVEC SUCCES" -ForegroundColor Green
