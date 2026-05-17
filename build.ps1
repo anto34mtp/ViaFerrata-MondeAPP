@@ -249,10 +249,12 @@ $GradleArgs = @(
     "-PKEYSTORE_KEY_PASSWORD=$KeyPwd"
 )
 
+$BuildStart = Get-Date
 & .\gradlew.bat @GradleArgs
-if ($LASTEXITCODE -ne 0) {
-    Write-Fail "Gradle a echoue (code $LASTEXITCODE). Voir les logs ci-dessus."
-}
+$GradleExit = $LASTEXITCODE
+
+# gradlew.bat sur Windows peut retourner 1 meme en cas de succes (bug connu).
+# On verifie donc l'existence du fichier genere plutot que le code de retour.
 
 # 11. Copie du fichier final
 Write-Step "Recuperation du fichier genere"
@@ -260,16 +262,20 @@ New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 
 if ($Format -eq "APK") {
-    $Generated = Get-ChildItem -Path "$AndroidDir\app\build\outputs\apk" -Recurse -Filter "*.apk" |
+    $Generated = Get-ChildItem -Path "$AndroidDir\app\build\outputs\apk" -Recurse -Filter "*.apk" -ErrorAction SilentlyContinue |
                  Sort-Object LastWriteTime -Descending | Select-Object -First 1
     $Dest = Join-Path $OutputDir "ViaFerrata_${Timestamp}.apk"
 } else {
-    $Generated = Get-ChildItem -Path "$AndroidDir\app\build\outputs\bundle" -Recurse -Filter "*.aab" |
+    $Generated = Get-ChildItem -Path "$AndroidDir\app\build\outputs\bundle" -Recurse -Filter "*.aab" -ErrorAction SilentlyContinue |
                  Sort-Object LastWriteTime -Descending | Select-Object -First 1
     $Dest = Join-Path $OutputDir "ViaFerrata_${Timestamp}.aab"
 }
 
-if (-not $Generated) { Write-Fail "Fichier genere introuvable." }
+if (-not $Generated) {
+    # Le fichier n'existe pas => le build a vraiment echoue
+    Write-Fail "Build echoue (code Gradle: $GradleExit) -- aucun fichier genere. Voir les logs ci-dessus."
+}
+# Si le fichier existe, le build a reussi meme si gradlew.bat a retourne un code non-zero
 
 Copy-Item $Generated.FullName -Destination $Dest
 $FileSize = [math]::Round((Get-Item $Dest).Length / 1MB, 1)
