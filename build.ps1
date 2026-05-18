@@ -206,11 +206,11 @@ if ($NeedsReinstall) {
 
 if (-not (Test-Path "node_modules")) {
     Write-Info "Installation des dependances..."
-    & npm install --legacy-peer-deps
+    & npm.cmd install --legacy-peer-deps
     if ($LASTEXITCODE -ne 0) { Write-Fail "npm install a echoue." }
 } else {
     Write-Info "node_modules present. Mise a jour..."
-    & npm install --legacy-peer-deps --prefer-offline
+    & npm.cmd install --legacy-peer-deps --prefer-offline
 }
 Write-OK "Dependances npm OK."
 
@@ -231,7 +231,7 @@ New-Item -ItemType Directory -Path $AssetsDir -Force | Out-Null
 $DevMode = if ($Variant -eq "debug") { "true" } else { "false" }
 Set-Location $AppDir
 Write-Info "npx react-native bundle --dev $DevMode ..."
-& npx react-native bundle `
+& npx.cmd react-native bundle `
     --platform android `
     --dev $DevMode `
     --entry-file index.js `
