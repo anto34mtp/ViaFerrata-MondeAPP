@@ -24,7 +24,7 @@ const MapScreen: React.FC = () => {
   const [points, setPoints] = useState<MapPoint[]>([]);
   const [htmlReady, setHtmlReady] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [activeKm, setActiveKm] = useState<Set<number>>(new Set());
+  const [activeKm, setActiveKm] = useState<number | null>(null);
   const userPos = useRef<{lat: number; lng: number} | null>(null);
 
   useEffect(() => {
@@ -130,20 +130,17 @@ const MapScreen: React.FC = () => {
 
   const handleRadius = useCallback(
     (km: number) => {
-      if (activeKm.has(km)) {
-        setActiveKm(prev => {
-          const n = new Set(prev);
-          n.delete(km);
-          return n;
-        });
+      if (activeKm === km) {
+        // Toggle off
+        setActiveKm(null);
         webRef.current?.injectJavaScript(`removeCircle(${km}); true;`);
         return;
       }
-      setActiveKm(prev => {
-        const n = new Set(prev);
-        n.add(km);
-        return n;
-      });
+      // Remove previous circle, select new one
+      if (activeKm !== null) {
+        webRef.current?.injectJavaScript(`removeCircle(${activeKm}); true;`);
+      }
+      setActiveKm(km);
       if (userPos.current) {
         const {lat, lng} = userPos.current;
         webRef.current?.injectJavaScript(
@@ -215,13 +212,13 @@ const MapScreen: React.FC = () => {
         {KM_BUTTONS.map(km => (
           <TouchableOpacity
             key={km}
-            style={[styles.kmBtn, activeKm.has(km) && styles.kmBtnActive]}
+            style={[styles.kmBtn, activeKm === km && styles.kmBtnActive]}
             onPress={() => handleRadius(km)}
             activeOpacity={0.75}>
             <Text
               style={[
                 styles.kmBtnText,
-                activeKm.has(km) && styles.kmBtnTextActive,
+                activeKm === km && styles.kmBtnTextActive,
               ]}>
               {km} km
             </Text>
@@ -247,11 +244,15 @@ function buildMapHTML(points: MapPoint[]): string {
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     html,body,#map{width:100%;height:100%;overflow:hidden}
     .leaflet-popup-content{margin:8px 10px;font-family:sans-serif}
+    .marker-cluster-small div,.marker-cluster-medium div,.marker-cluster-large div{font-weight:700}
   </style>
 </head>
 <body>
@@ -259,7 +260,7 @@ function buildMapHTML(points: MapPoint[]): string {
 <script>
 (function(){
   var VIAS = ${viasJson};
-  var map = L.map('map',{zoomControl:true}).setView([46.5,2.3],6);
+  var map = L.map('map',{zoomControl:true,clickTolerance:10}).setView([46.5,2.3],6);
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
     attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
@@ -272,17 +273,25 @@ function buildMapHTML(points: MapPoint[]): string {
     return DIFF_COLORS[Math.min(6,Math.max(0,Math.round((d-1)*6/9)))];
   }
 
+  var cluster = L.markerClusterGroup({
+    maxClusterRadius: 40,
+    showCoverageOnHover: false,
+    disableClusteringAtZoom: 12,
+  });
+
   VIAS.forEach(function(v){
     if(!v.gps_lat||!v.gps_lng)return;
     var m=L.circleMarker([v.gps_lat,v.gps_lng],{
-      radius:7,fillColor:diffColor(v.difficulty),color:'#fff',
-      weight:1.5,opacity:1,fillOpacity:0.88
-    }).addTo(map);
+      radius:9,fillColor:diffColor(v.difficulty),color:'#fff',
+      weight:2,opacity:1,fillOpacity:0.9
+    });
     var diff=v.difficulty?'<br><small style="color:#666">Difficulté: '+v.difficulty+'/10</small>':'';
     var slug=(v.slug||'').replace(/\\\\/g,'\\\\\\\\').replace(/'/g,"\\\\'");
     var nm=(v.name||'').replace(/\\\\/g,'\\\\\\\\').replace(/'/g,"\\\\'");
     m.bindPopup('<div style="min-width:155px"><b style="font-size:14px">'+v.name+'</b>'+diff+'<br><button onclick="openVia(\\''+slug+'\\',\\''+nm+'\\');" style="margin-top:8px;background:#2E7D32;color:#fff;border:none;padding:6px 10px;border-radius:6px;width:100%;font-size:13px;cursor:pointer">Voir le détail ›</button></div>');
+    cluster.addLayer(m);
   });
+  map.addLayer(cluster);
 
   var userMarker = null;
   var circles = {};
@@ -303,10 +312,11 @@ function buildMapHTML(points: MapPoint[]): string {
     map.setView([lat, lng], 12);
   };
 
-  // Called by RN to add a radius circle
+  // Called by RN to add a radius circle and auto-zoom to fit it
   window.addCircle = function(km, lat, lng){
     if(circles[km]) map.removeLayer(circles[km]);
     circles[km] = L.circle([lat, lng], circleOptions(km)).addTo(map);
+    map.fitBounds(circles[km].getBounds(), {padding:[30,30], maxZoom:13});
   };
 
   // Called by RN to remove a radius circle
