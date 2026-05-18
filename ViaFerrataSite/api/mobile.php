@@ -78,8 +78,8 @@ function normalizeVia(array $v): array {
         'gps_lat'               => isset($v['latitude']) && $v['latitude'] !== null ? (float)$v['latitude'] : null,
         'gps_lng'               => isset($v['longitude']) && $v['longitude'] !== null ? (float)$v['longitude'] : null,
         'opening_status'        => $v['opening_status'] ?? null,
-        'description'           => $v['description'] ?? null,
-        'pricing_info'          => $v['pricing'] ?? null,
+        'description'           => isset($v['description']) ? html_entity_decode($v['description'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
+        'pricing_info'          => isset($v['pricing']) ? html_entity_decode($v['pricing'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
         'tourism_office'        => $v['tourism_office_name'] ?? null,
         'avg_rating_general'    => isset($v['avg_general']) && $v['avg_general'] !== null ? round((float)$v['avg_general'], 1) : null,
         'avg_rating_beauty'     => isset($v['avg_beauty']) && $v['avg_beauty'] !== null ? round((float)$v['avg_beauty'], 1) : null,
@@ -552,7 +552,7 @@ if ($r0 === 'dashboard') {
                 'slug' => $f['slug'] ?? '',
             ],
         ];
-    }, array_slice($recentFavs, 0, 5));
+    }, array_slice($recentFavs, 0, 50));
 
     // Flatten logbook rows → nested {via: {name, slug}} for app
     $recentLog = $logModel->getByUser($uid);
@@ -592,7 +592,8 @@ if ($r0 === 'dashboard') {
 // ═══════════════════════════════════════════════════════════════════
 if ($r0 === 'submit' && $method === 'POST') {
     $b = body();
-    if (!empty(TURNSTILE_SECRET_KEY) && !verifyCloudflareTurnstile($b['turnstile_token'] ?? null)) {
+    $jwtSubmit = JWT::fromRequest();
+    if (!$jwtSubmit && !empty(TURNSTILE_SECRET_KEY) && !verifyCloudflareTurnstile($b['turnstile_token'] ?? null)) {
         merr('Vérification anti-spam échouée. Complétez le captcha.', 422);
     }
     $name     = trim($b['name'] ?? '');

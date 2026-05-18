@@ -25,15 +25,15 @@ const LEVELS = [
 ];
 
 const BADGES = [
-  {name: 'Premier Pas',  emoji: '👣', min: 1,   field: 'logbook_count'},
-  {name: 'Explorateur',  emoji: '🧭', min: 5,   field: 'logbook_count'},
-  {name: 'Confirmé',     emoji: '⛰️',  min: 10,  field: 'logbook_count'},
-  {name: 'Grimpeur',    emoji: '🧗', min: 25,  field: 'logbook_count'},
-  {name: 'Expert',      emoji: '⚡', min: 50,  field: 'logbook_count'},
-  {name: 'Légende',     emoji: '👑', min: 100, field: 'logbook_count'},
-  {name: 'Chroniqueur', emoji: '📓', min: 15,  field: 'logbook_count'},
-  {name: 'Critique',    emoji: '💬', min: 5,   field: 'done_count'},
-  {name: 'Vétéran',     emoji: '⭐', min: 30,  field: 'logbook_count'},
+  {name: 'Premier Pas',  emoji: '👣', min: 1,   field: 'done_count'},
+  {name: 'Explorateur',  emoji: '🧭', min: 5,   field: 'done_count'},
+  {name: 'Confirmé',     emoji: '⛰️',  min: 10,  field: 'done_count'},
+  {name: 'Grimpeur',    emoji: '🧗', min: 25,  field: 'done_count'},
+  {name: 'Expert',      emoji: '⚡', min: 50,  field: 'done_count'},
+  {name: 'Légende',     emoji: '👑', min: 100, field: 'done_count'},
+  {name: 'Chroniqueur', emoji: '📓', min: 5,   field: 'logbook_count'},
+  {name: 'Critique',    emoji: '💬', min: 3,   field: 'favorites_count'},
+  {name: 'Vétéran',     emoji: '⭐', min: 30,  field: 'done_count'},
 ];
 
 function getCurrentLevel(count: number) {
@@ -132,14 +132,14 @@ const DashboardScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Progression Card */}
-      {data?.stats && (data.stats.logbook_count || 0) > 0 && (() => {
-        const count = data.stats.logbook_count || 0;
+      {/* Progression Card — basée sur les vias réalisées (done_count) */}
+      {data?.stats && (() => {
+        const count = data.stats.done_count || 0;
         const currentLevel = getCurrentLevel(count);
         const nextLevel = getNextLevel(count);
         const prevMin = currentLevel.min;
         const nextMin = nextLevel ? nextLevel.min : prevMin;
-        const progress = nextLevel
+        const progress = nextLevel && nextMin > prevMin
           ? Math.min(1, (count - prevMin) / (nextMin - prevMin))
           : 1;
         const pct = Math.round(progress * 100);
@@ -151,7 +151,7 @@ const DashboardScreen: React.FC = () => {
               <Text style={styles.progressLevelName}>{currentLevel.name}</Text>
             </View>
             <Text style={{fontSize: 13, color: '#666', marginBottom: 10}}>
-              {count} vias complétées
+              {count} via{count > 1 ? 's' : ''} réalisée{count > 1 ? 's' : ''}
             </Text>
             <View style={styles.progressBar}>
               <View style={[styles.progressBarFill, {width: `${pct}%`}]} />
@@ -161,13 +161,13 @@ const DashboardScreen: React.FC = () => {
                 {nextLevel ? `Vers ${nextLevel.name}` : 'Niveau max !'}
               </Text>
               <Text style={styles.progressBarText}>
-                {nextLevel ? `${nextMin - count} vias restantes` : `${pct}%`}
+                {nextLevel ? `${nextMin - count} restantes` : '🏆'}
               </Text>
             </View>
             <View style={styles.progressStatsRow}>
               <View style={styles.progressStatBox}>
-                <Text style={styles.progressStatValue}>{data.stats.logbook_this_year || 0}</Text>
-                <Text style={styles.progressStatLabel}>Cette année</Text>
+                <Text style={styles.progressStatValue}>{data.stats.done_count || 0}</Text>
+                <Text style={styles.progressStatLabel}>Vias réalisées</Text>
               </View>
               <View style={styles.progressStatBox}>
                 <Text style={styles.progressStatValue}>{data.stats.logbook_count || 0}</Text>
@@ -179,7 +179,9 @@ const DashboardScreen: React.FC = () => {
               {BADGES.map(badge => {
                 const fieldValue = badge.field === 'done_count'
                   ? (data.stats.done_count || 0)
-                  : (data.stats.logbook_count || 0);
+                  : badge.field === 'logbook_count'
+                  ? (data.stats.logbook_count || 0)
+                  : (data.stats.favorites_count || 0);
                 const unlocked = fieldValue >= badge.min;
                 return (
                   <View key={badge.name} style={styles.badgeItem}>
@@ -232,41 +234,35 @@ const DashboardScreen: React.FC = () => {
         )}
       </View>
 
-      {/* Recent Logbook */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{t.dashboard.recentLogbook}</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Logbook')}>
-            <Text style={styles.seeAll}>{t.common.seeAll}</Text>
-          </TouchableOpacity>
-        </View>
-        {!data?.recent_logbook?.length ? (
-          <Text style={styles.emptyText}>{t.dashboard.noLogbook}</Text>
-        ) : (
-          data.recent_logbook.slice(0, 3).map(entry => (
-            <TouchableOpacity
-              key={entry.id}
-              style={styles.listItem}
-              onPress={() =>
-                entry.via &&
-                navigation.navigate('ViaDetail', {
-                  slug: entry.via.slug,
-                  name: entry.via.name,
-                })
-              }>
-              <Text style={styles.listItemEmoji}>📓</Text>
-              <View style={styles.listItemContent}>
-                <Text style={styles.listItemName}>
-                  {entry.via?.name || `Via #${entry.via_id}`}
-                </Text>
-                <Text style={styles.listItemSub}>
-                  {formatDate(entry.done_date)}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))
-        )}
-      </View>
+      {/* Dernières sorties = favoris avec status "done" */}
+      {(() => {
+        const doneFavs = (data?.recent_favorites || []).filter(f => f.status === 'done');
+        return (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Dernières sorties</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Favorites')}>
+                <Text style={styles.seeAll}>{t.common.seeAll}</Text>
+              </TouchableOpacity>
+            </View>
+            {!doneFavs.length ? (
+              <Text style={styles.emptyText}>Aucune via réalisée pour l'instant</Text>
+            ) : (
+              doneFavs.slice(0, 5).map(fav => (
+                <TouchableOpacity
+                  key={fav.id}
+                  style={styles.listItem}
+                  onPress={() => fav.via && navigation.navigate('ViaDetail', {slug: fav.via.slug})}>
+                  <Text style={styles.listItemEmoji}>✅</Text>
+                  <View style={styles.listItemContent}>
+                    <Text style={styles.listItemName}>{fav.via?.name || `Via #${fav.via_id}`}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        );
+      })()}
 
       {/* My Trips */}
       <View style={styles.section}>

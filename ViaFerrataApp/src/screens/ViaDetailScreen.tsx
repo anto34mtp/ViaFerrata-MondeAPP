@@ -269,23 +269,6 @@ const ViaDetailScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Photo upload button */}
-      <View style={styles.photoUploadRow}>
-        <TouchableOpacity
-          style={[styles.photoUploadBtn, {opacity: uploadingPhoto || !photoToken ? 0.6 : 1}]}
-          onPress={handleUploadPhoto}
-          disabled={uploadingPhoto || !photoToken}>
-          {uploadingPhoto
-            ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={styles.photoUploadBtnText}>📷 Proposer une photo</Text>}
-        </TouchableOpacity>
-        <TurnstileWidget onVerify={tok => setPhotoToken(tok)} />
-      </View>
-      {!!photoUploadedMsg && (
-        <View style={styles.photoUploadSuccess}>
-          <Text style={styles.photoUploadSuccessText}>{photoUploadedMsg}</Text>
-        </View>
-      )}
 
       {/* Header */}
       <View style={styles.header}>
@@ -522,11 +505,13 @@ const ViaDetailScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Photos de la communauté */}
-      {photos.length > 0 && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Photos de la communauté ({photos.length})</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      {/* Photos de la communauté + bouton proposer */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>
+          Photos de la communauté{photos.length > 0 ? ` (${photos.length})` : ''}
+        </Text>
+        {photos.length > 0 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 12}}>
             {photos.map((photo, i) => (
               <TouchableOpacity
                 key={photo.id}
@@ -539,8 +524,25 @@ const ViaDetailScreen: React.FC = () => {
               </TouchableOpacity>
             ))}
           </ScrollView>
-        </View>
-      )}
+        ) : (
+          <Text style={styles.emptyText}>Aucune photo pour l'instant. Soyez le premier !</Text>
+        )}
+
+        <TurnstileWidget onVerify={tok => setPhotoToken(tok)} />
+        <TouchableOpacity
+          style={[styles.photoUploadBtn, {opacity: uploadingPhoto || !photoToken ? 0.6 : 1, marginTop: 8}]}
+          onPress={handleUploadPhoto}
+          disabled={uploadingPhoto || !photoToken}>
+          {uploadingPhoto
+            ? <ActivityIndicator color="#fff" size="small" />
+            : <Text style={styles.photoUploadBtnText}>📷 Proposer une photo</Text>}
+        </TouchableOpacity>
+        {!!photoUploadedMsg && (
+          <View style={styles.photoUploadSuccess}>
+            <Text style={styles.photoUploadSuccessText}>{photoUploadedMsg}</Text>
+          </View>
+        )}
+      </View>
 
       {/* Lightbox modal for community photos */}
       <Modal
