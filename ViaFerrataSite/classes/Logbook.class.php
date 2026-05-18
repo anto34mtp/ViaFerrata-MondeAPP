@@ -84,7 +84,7 @@ class Logbook {
                          d.name     AS department_name,
                          d.code     AS department_code
                   FROM logbook_entries le
-                  INNER JOIN vias v ON le.via_id = v.id
+                  LEFT JOIN vias v ON le.via_id = v.id
                   LEFT JOIN departments d ON v.department_id = d.code
                   WHERE le.user_id = :user_id
                   ORDER BY le.done_date DESC, le.updated_at DESC";

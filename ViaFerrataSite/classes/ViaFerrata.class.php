@@ -109,6 +109,12 @@ class ViaFerrata {
             $params[':department_code'] = $filters['department_code'];
         }
 
+        // Filtre par pays
+        if (!empty($filters['country'])) {
+            $conditions[] = "v.country = :country";
+            $params[':country'] = $filters['country'];
+        }
+
         // Filtre par difficulté minimale
         if (isset($filters['difficulty_min'])) {
             $conditions[] = "v.difficulty >= :difficulty_min";
@@ -135,6 +141,9 @@ class ViaFerrata {
             switch ($filters['order_by']) {
                 case 'name':
                     $orderBy = "v.name ASC";
+                    break;
+                case 'recent':
+                    $orderBy = "v.created_at DESC";
                     break;
                 case 'rating':
                     $orderBy = "vrs.avg_overall DESC";
@@ -242,6 +251,11 @@ class ViaFerrata {
             $conditions[] = "d.code = :department_code";
             $params[':department_code'] = $filters['department_code'];
             $needsDept = true;
+        }
+
+        if (!empty($filters['country'])) {
+            $conditions[] = "v.country = :country";
+            $params[':country'] = $filters['country'];
         }
 
         if (isset($filters['difficulty_min'])) {
