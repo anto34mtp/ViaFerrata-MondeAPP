@@ -45,6 +45,7 @@ export interface Via {
   avg_rating_beauty?: number;
   avg_rating_difficulty?: number;
   ratings_count?: number;
+  image_url?: string;
   photos?: Photo[];
   comments?: Comment[];
   ratings?: Rating[];

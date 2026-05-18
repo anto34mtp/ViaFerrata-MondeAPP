@@ -17,7 +17,10 @@ interface Props {
 }
 
 const ViaCard: React.FC<Props> = ({via, onPress}) => {
-  const coverPhoto = via.photos && via.photos.length > 0 ? via.photos[0].url : null;
+  const coverPhoto =
+    (via.photos && via.photos.length > 0)
+      ? via.photos[0].url
+      : (via.image_url ?? null);
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>

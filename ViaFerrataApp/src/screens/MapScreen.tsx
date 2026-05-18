@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import {WebView} from 'react-native-webview';
 import {useNavigation} from '@react-navigation/native';
+import Geolocation from '@react-native-community/geolocation';
 import {getMapVias, MapPoint} from '../api/client';
 
 const MapScreen: React.FC = () => {
@@ -47,7 +48,7 @@ const MapScreen: React.FC = () => {
           return;
         }
       }
-      navigator.geolocation.getCurrentPosition(
+      Geolocation.getCurrentPosition(
         pos => {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;

@@ -201,7 +201,7 @@ const ViaDetailScreen: React.FC = () => {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Photos */}
+      {/* Photos / image de couverture */}
       {photos.length > 0 ? (
         <View>
           <FlatList
@@ -233,6 +233,12 @@ const ViaDetailScreen: React.FC = () => {
             </View>
           )}
         </View>
+      ) : via.image_url ? (
+        <Image
+          source={{uri: via.image_url}}
+          style={{width, height: 240}}
+          resizeMode="cover"
+        />
       ) : (
         <View style={styles.noPhoto}>
           <Text style={styles.noPhotoText}>🏔️</Text>
