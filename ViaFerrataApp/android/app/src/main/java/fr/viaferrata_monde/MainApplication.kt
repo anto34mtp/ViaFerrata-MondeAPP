@@ -1,4 +1,4 @@
-package com.viaferrataapp
+package fr.viaferrata_monde
 
 import android.app.Application
 import com.facebook.react.PackageList

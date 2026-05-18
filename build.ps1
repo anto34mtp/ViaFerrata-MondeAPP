@@ -144,7 +144,7 @@ Write-OK "Alias : $KeyAlias"
 # 5. Format APK ou AAB
 Write-Step "Format de sortie"
 Write-Host "  [1] APK  -- installation directe / test appareil" -ForegroundColor White
-Write-Host "  [2] AAB  -- Google Play Store" -ForegroundColor White
+Write-Host "  [2] AAB  -- Google Play Store (incremente la version automatiquement)" -ForegroundColor White
 Write-Host ""
 $FormatChoice = ""
 do { $FormatChoice = Read-Host "  Choix [1 ou 2]" } while ($FormatChoice -ne "1" -and $FormatChoice -ne "2")
@@ -170,6 +170,39 @@ if ($VariantInput -eq "2") {
 } else {
     $Variant = "release"
     Write-OK "Variante : release"
+}
+
+# 6b. Auto-increment de version pour Play Store (AAB Release uniquement)
+$BuildGradlePath = Join-Path $AndroidDir "app\build.gradle"
+if ($Format -eq "AAB" -and $Variant -eq "release") {
+    Write-Step "Increment automatique de la version (Play Store)"
+    $GradleContent = Get-Content $BuildGradlePath -Raw
+
+    # Incrementer versionCode
+    if ($GradleContent -match 'versionCode\s+(\d+)') {
+        $OldCode = [int]$Matches[1]
+        $NewCode = $OldCode + 1
+        $GradleContent = $GradleContent -replace "versionCode\s+$OldCode\b", "versionCode $NewCode"
+        Write-OK "versionCode : $OldCode  -->  $NewCode"
+    }
+
+    # Incrementer le patch de versionName  (ex: "1.0.3" --> "1.0.4")
+    if ($GradleContent -match 'versionName\s+"(\d+)\.(\d+)\.(\d+)"') {
+        $Maj = $Matches[1]; $Min = $Matches[2]; $Pat = [int]$Matches[3]
+        $OldName = "$Maj.$Min.$Pat"
+        $NewName = "$Maj.$Min.$($Pat + 1)"
+        $GradleContent = $GradleContent -replace "versionName\s+`"$OldName`"", "versionName `"$NewName`""
+        Write-OK "versionName : $OldName  -->  $NewName"
+    }
+
+    Set-Content $BuildGradlePath -Value $GradleContent -NoNewline
+    Write-OK "build.gradle mis a jour."
+} else {
+    # Lire les versions actuelles pour les afficher dans le resume
+    $GradleContent = Get-Content $BuildGradlePath -Raw
+    if ($GradleContent -match 'versionCode\s+(\d+)') { $NewCode = [int]$Matches[1] }
+    if ($GradleContent -match 'versionName\s+"([^"]+)"') { $NewName = $Matches[1] }
+    Write-Info "Version actuelle : $NewName (code $NewCode) -- pas d'increment en mode $Format/$Variant."
 }
 
 # 7. npm install
@@ -303,6 +336,7 @@ Write-Host "  BUILD TERMINE AVEC SUCCES" -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Format  : $Format ($Variant)" -ForegroundColor White
+Write-Host "  Version : $NewName (code $NewCode)" -ForegroundColor White
 Write-Host "  Fichier : $Dest" -ForegroundColor White
 Write-Host "  Taille  : $FileSize MB" -ForegroundColor White
 $ksLeaf = Split-Path -Leaf $KeystoreFile
