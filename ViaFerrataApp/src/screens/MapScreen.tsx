@@ -8,11 +8,14 @@ import {
   PermissionsAndroid,
   Alert,
   Linking,
+  TouchableOpacity,
 } from 'react-native';
 import {WebView} from 'react-native-webview';
 import {useNavigation} from '@react-navigation/native';
 import Geolocation from '@react-native-community/geolocation';
 import {getMapVias, MapPoint} from '../api/client';
+
+const KM_BUTTONS = [25, 50, 100, 200];
 
 const MapScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -20,7 +23,9 @@ const MapScreen: React.FC = () => {
   const [webLoading, setWebLoading] = useState(true);
   const [points, setPoints] = useState<MapPoint[]>([]);
   const [htmlReady, setHtmlReady] = useState(false);
-  const permissionGranted = useRef(false);
+  const [locating, setLocating] = useState(false);
+  const [activeKm, setActiveKm] = useState<Set<number>>(new Set());
+  const userPos = useRef<{lat: number; lng: number} | null>(null);
 
   useEffect(() => {
     getMapVias()
@@ -36,24 +41,13 @@ const MapScreen: React.FC = () => {
       .finally(() => setHtmlReady(true));
   }, []);
 
-  // Ask for location permission as soon as the map screen opens (Android only).
-  // This ensures the system dialog appears on first visit rather than only when
-  // the user presses the locate button, where a stale "never ask again" state
-  // would silently swallow the request.
+  // Request permission proactively when the map screen opens
   useEffect(() => {
-    if (Platform.OS !== 'android') {
-      permissionGranted.current = true;
-      return;
-    }
+    if (Platform.OS !== 'android') return;
     (async () => {
       const perm = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
-
       const already = await PermissionsAndroid.check(perm);
-      if (already) {
-        permissionGranted.current = true;
-        return;
-      }
-
+      if (already) return;
       const result = await PermissionsAndroid.request(perm, {
         title: 'Localisation requise',
         message:
@@ -61,10 +55,7 @@ const MapScreen: React.FC = () => {
         buttonPositive: 'Autoriser',
         buttonNegative: 'Plus tard',
       });
-
-      if (result === PermissionsAndroid.RESULTS.GRANTED) {
-        permissionGranted.current = true;
-      } else if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+      if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
         Alert.alert(
           'Permission GPS bloquée',
           "La localisation a été refusée définitivement. Activez-la dans les paramètres de l'application.",
@@ -80,54 +71,39 @@ const MapScreen: React.FC = () => {
     })();
   }, []);
 
-  const getPosition = useCallback(() => {
-    Geolocation.getCurrentPosition(
-      pos => {
-        const {latitude: lat, longitude: lng} = pos.coords;
-        webRef.current?.injectJavaScript(
-          `setUserLocation(${lat}, ${lng}); true;`,
+  // Core position getter — checks permission then resolves GPS
+  const getPosition = useCallback(
+    (onSuccess?: (lat: number, lng: number) => void) => {
+      const doFetch = () => {
+        Geolocation.getCurrentPosition(
+          pos => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            userPos.current = {lat, lng};
+            webRef.current?.injectJavaScript(
+              `setUserLocation(${lat}, ${lng}); true;`,
+            );
+            setLocating(false);
+            onSuccess?.(lat, lng);
+          },
+          err => {
+            setLocating(false);
+            Alert.alert('GPS indisponible', err.message ?? 'Erreur inconnue');
+          },
+          {enableHighAccuracy: true, timeout: 15000, maximumAge: 60000},
         );
-      },
-      err => {
-        const msg = err.message ?? 'Erreur inconnue';
-        webRef.current?.injectJavaScript(
-          `locateError(${JSON.stringify(msg)}); true;`,
-        );
-        Alert.alert('GPS indisponible', msg);
-      },
-      {enableHighAccuracy: true, timeout: 15000, maximumAge: 60000},
-    );
-  }, []);
+      };
 
-  // Called from the WebView when the user taps "Me localiser" or a km button.
-  // Re-checks permission each time so granting via Settings is picked up.
-  const requestLocation = useCallback(async () => {
-    if (Platform.OS === 'android') {
-      const perm = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
-      const granted = await PermissionsAndroid.check(perm);
-      permissionGranted.current = granted;
-
-      if (!granted) {
-        // Try requesting one more time (covers the case where the user was
-        // shown the dialog earlier but chose "Plus tard").
-        const result = await PermissionsAndroid.request(perm, {
-          title: 'Localisation requise',
-          message:
-            'ViaFerrata Monde a besoin de votre position pour afficher les vias proches de vous.',
-          buttonPositive: 'Autoriser',
-          buttonNegative: 'Refuser',
-        });
-
-        if (result === PermissionsAndroid.RESULTS.GRANTED) {
-          permissionGranted.current = true;
-          getPosition();
-        } else {
-          webRef.current?.injectJavaScript(
-            `locateError('Permission GPS refusée'); true;`,
-          );
-          if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+      if (Platform.OS === 'android') {
+        PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        ).then(granted => {
+          if (granted) {
+            doFetch();
+          } else {
+            setLocating(false);
             Alert.alert(
-              'Permission GPS bloquée',
+              'Permission GPS requise',
               "Activez la localisation dans les paramètres de l'application.",
               [
                 {text: 'Annuler', style: 'cancel'},
@@ -138,12 +114,52 @@ const MapScreen: React.FC = () => {
               ],
             );
           }
-        }
+        });
+      } else {
+        doFetch();
+      }
+    },
+    [],
+  );
+
+  const handleLocate = useCallback(() => {
+    if (locating) return;
+    setLocating(true);
+    getPosition();
+  }, [locating, getPosition]);
+
+  const handleRadius = useCallback(
+    (km: number) => {
+      if (activeKm.has(km)) {
+        setActiveKm(prev => {
+          const n = new Set(prev);
+          n.delete(km);
+          return n;
+        });
+        webRef.current?.injectJavaScript(`removeCircle(${km}); true;`);
         return;
       }
-    }
-    getPosition();
-  }, [getPosition]);
+      setActiveKm(prev => {
+        const n = new Set(prev);
+        n.add(km);
+        return n;
+      });
+      if (userPos.current) {
+        const {lat, lng} = userPos.current;
+        webRef.current?.injectJavaScript(
+          `addCircle(${km}, ${lat}, ${lng}); true;`,
+        );
+      } else {
+        setLocating(true);
+        getPosition((lat, lng) => {
+          webRef.current?.injectJavaScript(
+            `addCircle(${km}, ${lat}, ${lng}); true;`,
+          );
+        });
+      }
+    },
+    [activeKm, getPosition],
+  );
 
   const handleMessage = useCallback(
     (event: {nativeEvent: {data: string}}) => {
@@ -154,12 +170,10 @@ const MapScreen: React.FC = () => {
             slug: msg.slug,
             name: msg.name ?? msg.slug,
           });
-        } else if (msg.type === 'locate') {
-          requestLocation();
         }
       } catch {}
     },
-    [navigation, requestLocation],
+    [navigation],
   );
 
   if (!htmlReady) {
@@ -185,6 +199,36 @@ const MapScreen: React.FC = () => {
         onError={() => setWebLoading(false)}
         mixedContentMode={Platform.OS === 'android' ? 'always' : undefined}
       />
+
+      {/* Native RN overlay — avoids WebView touch-event issues */}
+      <View style={styles.controls} pointerEvents="box-none">
+        <TouchableOpacity
+          style={styles.locateBtn}
+          onPress={handleLocate}
+          activeOpacity={0.75}>
+          {locating ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.locateBtnText}>📍 Me localiser</Text>
+          )}
+        </TouchableOpacity>
+        {KM_BUTTONS.map(km => (
+          <TouchableOpacity
+            key={km}
+            style={[styles.kmBtn, activeKm.has(km) && styles.kmBtnActive]}
+            onPress={() => handleRadius(km)}
+            activeOpacity={0.75}>
+            <Text
+              style={[
+                styles.kmBtnText,
+                activeKm.has(km) && styles.kmBtnTextActive,
+              ]}>
+              {km} km
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       {webLoading && (
         <View style={styles.overlay}>
           <ActivityIndicator size="large" color="#2E7D32" />
@@ -207,22 +251,11 @@ function buildMapHTML(points: MapPoint[]): string {
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     html,body,#map{width:100%;height:100%;overflow:hidden}
-    #controls{position:absolute;top:56px;right:8px;z-index:1000;display:flex;flex-direction:column;gap:5px}
-    .ctrl-btn{background:white;border:1px solid rgba(0,0,0,0.25);border-radius:6px;padding:7px 11px;font-size:13px;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,0.18);font-family:sans-serif;white-space:nowrap;touch-action:manipulation;user-select:none;-webkit-user-select:none}
-    .ctrl-btn.active{background:#2E7D32;color:white;border-color:#2E7D32}
-    #locate-btn{background:#2E7D32;color:white;border-color:#2E7D32;font-weight:700}
     .leaflet-popup-content{margin:8px 10px;font-family:sans-serif}
   </style>
 </head>
 <body>
 <div id="map"></div>
-<div id="controls">
-  <button class="ctrl-btn" id="locate-btn" onclick="locateMe()">📍 Me localiser</button>
-  <button class="ctrl-btn" id="r25" onclick="toggleRadius(25)">25 km</button>
-  <button class="ctrl-btn" id="r50" onclick="toggleRadius(50)">50 km</button>
-  <button class="ctrl-btn" id="r100" onclick="toggleRadius(100)">100 km</button>
-  <button class="ctrl-btn" id="r200" onclick="toggleRadius(200)">200 km</button>
-</div>
 <script>
 (function(){
   var VIAS = ${viasJson};
@@ -251,64 +284,38 @@ function buildMapHTML(points: MapPoint[]): string {
     m.bindPopup('<div style="min-width:155px"><b style="font-size:14px">'+v.name+'</b>'+diff+'<br><button onclick="openVia(\\''+slug+'\\',\\''+nm+'\\');" style="margin-top:8px;background:#2E7D32;color:#fff;border:none;padding:6px 10px;border-radius:6px;width:100%;font-size:13px;cursor:pointer">Voir le détail ›</button></div>');
   });
 
-  var userMarker=null,circles={},pendingKm=null;
+  var userMarker = null;
+  var circles = {};
 
   function circleOptions(km){
     return {radius:km*1000,color:'#2E7D32',fillColor:'#4CAF50',fillOpacity:0.05,weight:2,dashArray:'8 10'};
   }
 
-  window.setUserLocation=function(lat,lng){
-    document.getElementById('locate-btn').textContent='📍 Me localiser';
-    if(userMarker)map.removeLayer(userMarker);
-    userMarker=L.marker([lat,lng],{
-      icon:L.divIcon({
-        html:'<div style="width:16px;height:16px;background:#2196F3;border:3px solid #fff;border-radius:50%;box-shadow:0 0 8px rgba(33,150,243,0.7)"></div>',
-        iconSize:[16,16],iconAnchor:[8,8],className:''
+  // Called by RN via injectJavaScript after GPS position is obtained
+  window.setUserLocation = function(lat, lng){
+    if(userMarker) map.removeLayer(userMarker);
+    userMarker = L.marker([lat, lng], {
+      icon: L.divIcon({
+        html: '<div style="width:16px;height:16px;background:#2196F3;border:3px solid #fff;border-radius:50%;box-shadow:0 0 8px rgba(33,150,243,0.7)"></div>',
+        iconSize:[16,16], iconAnchor:[8,8], className:''
       })
     }).addTo(map).bindPopup('Vous êtes ici');
-    map.setView([lat,lng],12);
-    Object.keys(circles).forEach(function(k){
-      map.removeLayer(circles[k]);
-      circles[k]=L.circle([lat,lng],circleOptions(parseInt(k))).addTo(map);
-    });
-    if(pendingKm!==null){
-      var pk=pendingKm; pendingKm=null;
-      circles[pk]=L.circle([lat,lng],circleOptions(pk)).addTo(map);
-      document.getElementById('r'+pk).classList.add('active');
-    }
+    map.setView([lat, lng], 12);
   };
 
-  window.locateError=function(msg){
-    document.getElementById('locate-btn').textContent='📍 Me localiser';
+  // Called by RN to add a radius circle
+  window.addCircle = function(km, lat, lng){
+    if(circles[km]) map.removeLayer(circles[km]);
+    circles[km] = L.circle([lat, lng], circleOptions(km)).addTo(map);
   };
 
-  function locateMe(){
-    document.getElementById('locate-btn').textContent='⏳ Localisation…';
-    try{window.ReactNativeWebView.postMessage(JSON.stringify({type:'locate'}));}catch(e){
-      document.getElementById('locate-btn').textContent='📍 Me localiser';
-    }
-  }
+  // Called by RN to remove a radius circle
+  window.removeCircle = function(km){
+    if(circles[km]){ map.removeLayer(circles[km]); delete circles[km]; }
+  };
 
-  function toggleRadius(km){
-    var btn=document.getElementById('r'+km);
-    if(circles[km]){
-      map.removeLayer(circles[km]);
-      delete circles[km];
-      btn.classList.remove('active');
-      return;
-    }
-    if(!userMarker){
-      pendingKm=km;
-      locateMe();
-      return;
-    }
-    var ll=userMarker.getLatLng();
-    circles[km]=L.circle([ll.lat,ll.lng],circleOptions(km)).addTo(map);
-    btn.classList.add('active');
-  }
-
-  function openVia(slug,name){
-    try{window.ReactNativeWebView.postMessage(JSON.stringify({type:'via',slug:slug,name:name}));}catch(e){}
+  function openVia(slug, name){
+    try{ window.ReactNativeWebView.postMessage(JSON.stringify({type:'via',slug:slug,name:name})); }catch(e){}
   }
 })();
 </script>
@@ -319,6 +326,59 @@ function buildMapHTML(points: MapPoint[]): string {
 const styles = StyleSheet.create({
   container: {flex: 1},
   webview: {flex: 1},
+  controls: {
+    position: 'absolute',
+    top: 56,
+    right: 8,
+    alignItems: 'flex-end',
+  },
+  locateBtn: {
+    backgroundColor: '#2E7D32',
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 5,
+    minWidth: 130,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  locateBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  kmBtn: {
+    backgroundColor: '#fff',
+    borderRadius: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    marginBottom: 5,
+    minWidth: 80,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.2)',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  kmBtnActive: {
+    backgroundColor: '#2E7D32',
+    borderColor: '#2E7D32',
+  },
+  kmBtnText: {
+    color: '#333',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  kmBtnTextActive: {
+    color: '#fff',
+  },
   centered: {
     flex: 1,
     justifyContent: 'center',
