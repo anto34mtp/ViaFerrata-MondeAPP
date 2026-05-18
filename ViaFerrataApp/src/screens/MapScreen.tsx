@@ -6,11 +6,18 @@ import {
   StyleSheet,
   Platform,
   PermissionsAndroid,
+  Alert,
+  Linking,
 } from 'react-native';
 import {WebView} from 'react-native-webview';
 import {useNavigation} from '@react-navigation/native';
 import Geolocation from '@react-native-community/geolocation';
 import {getMapVias, MapPoint} from '../api/client';
+
+Geolocation.setRNConfiguration({
+  skipPermissionRequests: true,
+  authorizationLevel: 'whenInUse',
+});
 
 const MapScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -30,40 +37,64 @@ const MapScreen: React.FC = () => {
       .finally(() => setHtmlReady(true));
   }, []);
 
+  const getPosition = useCallback(() => {
+    Geolocation.getCurrentPosition(
+      pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        webRef.current?.injectJavaScript(`setUserLocation(${lat}, ${lng}); true;`);
+      },
+      err => {
+        const msg = err.message ?? 'Erreur inconnue';
+        webRef.current?.injectJavaScript(`locateError(${JSON.stringify(msg)}); true;`);
+      },
+      {enableHighAccuracy: true, timeout: 15000, maximumAge: 60000},
+    );
+  }, []);
+
   // Geolocation handled on RN side — injecte les coords dans le WebView
   const requestLocation = useCallback(async () => {
     try {
       if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          {
-            title: 'Localisation requise',
-            message: 'ViaFerrata Monde a besoin de votre position pour afficher les vias proches de vous.',
-            buttonPositive: 'Autoriser',
-            buttonNegative: 'Refuser',
-          },
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          webRef.current?.injectJavaScript(`locateError('Permission refusée'); true;`);
+        const perm = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
+        const current = await PermissionsAndroid.check(perm);
+
+        if (current) {
+          // Already granted — go straight to position
+          getPosition();
           return;
         }
+
+        const result = await PermissionsAndroid.request(perm, {
+          title: 'Localisation requise',
+          message: 'ViaFerrata Monde a besoin de votre position pour afficher les vias proches de vous.',
+          buttonPositive: 'Autoriser',
+          buttonNegative: 'Refuser',
+        });
+
+        if (result === PermissionsAndroid.RESULTS.GRANTED) {
+          getPosition();
+        } else if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+          webRef.current?.injectJavaScript(`locateError('Permission refusée'); true;`);
+          Alert.alert(
+            'Permission GPS refusée',
+            'Vous avez bloqué la localisation. Activez-la dans les paramètres de l\'application.',
+            [
+              {text: 'Annuler', style: 'cancel'},
+              {text: 'Ouvrir les paramètres', onPress: () => Linking.openSettings()},
+            ],
+          );
+        } else {
+          webRef.current?.injectJavaScript(`locateError('Permission refusée'); true;`);
+        }
+      } else {
+        // iOS: Geolocation.requestAuthorization() handled internally
+        getPosition();
       }
-      Geolocation.getCurrentPosition(
-        pos => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          webRef.current?.injectJavaScript(`setUserLocation(${lat}, ${lng}); true;`);
-        },
-        err => {
-          const msg = err.message ?? 'Erreur inconnue';
-          webRef.current?.injectJavaScript(`locateError(${JSON.stringify(msg)}); true;`);
-        },
-        {enableHighAccuracy: true, timeout: 15000, maximumAge: 60000},
-      );
     } catch {
       webRef.current?.injectJavaScript(`locateError('Erreur inattendue'); true;`);
     }
-  }, []);
+  }, [getPosition]);
 
   const handleMessage = (event: {nativeEvent: {data: string}}) => {
     try {
