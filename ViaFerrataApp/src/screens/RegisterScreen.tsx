@@ -15,6 +15,7 @@ import {useNavigation} from '@react-navigation/native';
 import {register as apiRegister} from '../api/client';
 import {useAuth} from '../context/AuthContext';
 import {useLang} from '../context/LangContext';
+import TurnstileWidget from '../components/TurnstileWidget';
 
 const RegisterScreen: React.FC = () => {
   const {t} = useLang();
@@ -24,6 +25,7 @@ const RegisterScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const handleRegister = async () => {
     if (!username.trim() || !email.trim() || !password.trim()) return;
@@ -33,6 +35,7 @@ const RegisterScreen: React.FC = () => {
         username: username.trim(),
         email: email.trim(),
         password,
+        turnstile_token: turnstileToken || undefined,
       });
       await login(res.data.token, res.data.user);
       navigation.goBack();
@@ -43,7 +46,7 @@ const RegisterScreen: React.FC = () => {
     }
   };
 
-  const isValid = username.trim() && email.trim() && password.trim();
+  const isValid = username.trim() && email.trim() && password.trim() && !!turnstileToken;
 
   return (
     <KeyboardAvoidingView
@@ -89,6 +92,8 @@ const RegisterScreen: React.FC = () => {
             returnKeyType="done"
             onSubmitEditing={handleRegister}
           />
+
+          <TurnstileWidget onVerify={token => setTurnstileToken(token)} />
 
           <TouchableOpacity
             style={[styles.button, (!isValid || loading) && styles.buttonDisabled]}

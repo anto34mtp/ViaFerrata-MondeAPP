@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import {apiClient} from '../api/client';
 import {useLang} from '../context/LangContext';
+import TurnstileWidget from '../components/TurnstileWidget';
 
 const PRIMARY = '#2E7D32';
 
@@ -49,6 +50,7 @@ export default function SubmitViaScreen() {
   });
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const setField = useCallback((key: string) => (v: string) => setForm(f => ({...f, [key]: v})), []);
 
@@ -71,6 +73,7 @@ export default function SubmitViaScreen() {
         elevation_gain: form.elevation_gain ? parseInt(form.elevation_gain, 10) : undefined,
         description: form.description.trim() || undefined,
         author_email: form.author_email.trim() || undefined,
+        turnstile_token: turnstileToken || undefined,
       });
       setSubmitted(true);
     } catch {
@@ -142,10 +145,12 @@ export default function SubmitViaScreen() {
 
       <Field label={t('submit.email')} value={form.author_email} onChangeText={setField('author_email')} placeholder="votre@email.com" keyboardType="email-address" />
 
+      <TurnstileWidget onVerify={token => setTurnstileToken(token)} />
+
       <TouchableOpacity
-        style={[styles.submitBtn, saving && styles.disabled]}
+        style={[styles.submitBtn, (saving || !turnstileToken) && styles.disabled]}
         onPress={handleSubmit}
-        disabled={saving}>
+        disabled={saving || !turnstileToken}>
         <Text style={styles.submitBtnText}>{saving ? '...' : t('submit.submit')}</Text>
       </TouchableOpacity>
     </ScrollView>
