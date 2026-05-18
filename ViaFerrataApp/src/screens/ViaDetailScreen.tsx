@@ -607,15 +607,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   noPhotoText: {fontSize: 60},
-  photoDots: {
-    position: 'absolute',
-    bottom: 12,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
-  },
   dot: {
     width: 7,
     height: 7,
