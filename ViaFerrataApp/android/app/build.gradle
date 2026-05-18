@@ -1,0 +1,70 @@
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
+
+
+def enableProguardInReleaseBuilds = true
+
+def keystorePropertiesFile = rootProject.file("../keystore/keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+def ksPath          = project.hasProperty('KEYSTORE_PATH')           ? project.KEYSTORE_PATH           : (keystoreProperties['storeFile'] ? "../keystore/${keystoreProperties['storeFile']}" : "../../keystore/viaferrata.keystore")
+def ksStorePassword = project.hasProperty('KEYSTORE_STORE_PASSWORD') ? project.KEYSTORE_STORE_PASSWORD : (keystoreProperties['storePassword'] ?: "")
+def ksKeyAlias      = project.hasProperty('KEYSTORE_KEY_ALIAS')      ? project.KEYSTORE_KEY_ALIAS      : (keystoreProperties['keyAlias'] ?: "")
+def ksKeyPassword   = project.hasProperty('KEYSTORE_KEY_PASSWORD')   ? project.KEYSTORE_KEY_PASSWORD   : (keystoreProperties['keyPassword'] ?: "")
+
+android {
+    ndkVersion rootProject.ext.ndkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
+
+    namespace "com.viaferrataapp"
+
+    defaultConfig {
+        applicationId "com.viaferrataapp"
+        minSdk rootProject.ext.minSdkVersion
+        targetSdk rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file(ksPath)
+            storePassword ksStorePassword
+            keyAlias ksKeyAlias
+            keyPassword ksKeyPassword
+        }
+    }
+
+    buildTypes {
+        debug {
+            // Gradle utilise automatiquement le debug keystore par defaut
+        }
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled enableProguardInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+}
+
+// Force androidx.core to a version compatible with compileSdk 34 (AGP 8.1.x).
+// Some transitive dependencies pull androidx.core:1.15.0 which requires compileSdk 35.
+configurations.all {
+    resolutionStrategy {
+        force "androidx.core:core:1.13.1"
+        force "androidx.core:core-ktx:1.13.1"
+    }
+}
+
+dependencies {
+    implementation("com.facebook.react:react-android")
+    implementation("com.facebook.react:hermes-android")
+}
+
+apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
