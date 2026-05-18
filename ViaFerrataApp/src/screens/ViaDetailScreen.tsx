@@ -16,12 +16,14 @@ import {
 } from 'react-native';
 import {useRoute, useNavigation} from '@react-navigation/native';
 import {WebView} from 'react-native-webview';
-import {getViaDetail, rateVia, commentVia, addFavorite, deleteFavorite, getFavorites, Via} from '../api/client';
+import {launchImageLibrary} from 'react-native-image-picker';
+import {getViaDetail, rateVia, commentVia, uploadViaPhoto, addFavorite, deleteFavorite, getFavorites, Via} from '../api/client';
 import {useLang} from '../context/LangContext';
 import {useAuth} from '../context/AuthContext';
 import DifficultyBadge from '../components/DifficultyBadge';
 import StatusBadge from '../components/StatusBadge';
 import RatingBar from '../components/RatingBar';
+import TurnstileWidget from '../components/TurnstileWidget';
 import {formatDuration, formatGPS} from '../utils/helpers';
 
 const {width} = Dimensions.get('window');
@@ -95,8 +97,13 @@ const ViaDetailScreen: React.FC = () => {
   const [commentText, setCommentText] = useState('');
   const [authorName, setAuthorName] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [commentToken, setCommentToken] = useState<string | null>(null);
 
-  // Photos state
+  // Photo upload state
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoUploadedMsg, setPhotoUploadedMsg] = useState('');
+
+  // Photos gallery state
   const [photoIndex, setPhotoIndex] = useState(0);
 
   // Dynamic heights for HTML WebViews
@@ -188,14 +195,33 @@ const ViaDetailScreen: React.FC = () => {
       await commentVia(slug, {
         content: commentText.trim(),
         author_name: authorName.trim() || undefined,
+        turnstile_token: commentToken || undefined,
       });
       setCommentText('');
       setAuthorName('');
+      setCommentToken(null);
       fetchVia();
     } catch (e) {
       Alert.alert(t.common.error, String(e));
     } finally {
       setSubmittingComment(false);
+    }
+  };
+
+  const handleUploadPhoto = async () => {
+    const result = await launchImageLibrary({mediaType: 'photo', quality: 0.8, selectionLimit: 1});
+    if (result.didCancel || !result.assets?.length) return;
+    const asset = result.assets[0];
+    if (!asset.uri) return;
+    setUploadingPhoto(true);
+    setPhotoUploadedMsg('');
+    try {
+      await uploadViaPhoto(slug, asset.uri, undefined);
+      setPhotoUploadedMsg('Photo envoyée ! Elle sera visible après validation par nos modérateurs.');
+    } catch (e) {
+      Alert.alert(t.common.error, 'Impossible d\'envoyer la photo.');
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -262,6 +288,23 @@ const ViaDetailScreen: React.FC = () => {
       ) : (
         <View style={styles.noPhoto}>
           <Text style={styles.noPhotoText}>🏔️</Text>
+        </View>
+      )}
+
+      {/* Photo upload button */}
+      <View style={styles.photoUploadRow}>
+        <TouchableOpacity
+          style={styles.photoUploadBtn}
+          onPress={handleUploadPhoto}
+          disabled={uploadingPhoto}>
+          {uploadingPhoto
+            ? <ActivityIndicator color="#fff" size="small" />
+            : <Text style={styles.photoUploadBtnText}>📷 Proposer une photo</Text>}
+        </TouchableOpacity>
+      </View>
+      {!!photoUploadedMsg && (
+        <View style={styles.photoUploadSuccess}>
+          <Text style={styles.photoUploadSuccessText}>{photoUploadedMsg}</Text>
         </View>
       )}
 
@@ -483,10 +526,11 @@ const ViaDetailScreen: React.FC = () => {
             numberOfLines={3}
             textAlignVertical="top"
           />
+          <TurnstileWidget onVerify={token => setCommentToken(token)} />
           <TouchableOpacity
-            style={[styles.submitBtn, !commentText.trim() && styles.submitBtnDisabled]}
+            style={[styles.submitBtn, (!commentText.trim() || !commentToken) && styles.submitBtnDisabled]}
             onPress={handleSubmitComment}
-            disabled={submittingComment || !commentText.trim()}>
+            disabled={submittingComment || !commentText.trim() || !commentToken}>
             {submittingComment ? (
               <ActivityIndicator color="#FFF" size="small" />
             ) : (
@@ -714,6 +758,28 @@ const styles = StyleSheet.create({
     height: 80,
     textAlignVertical: 'top',
   },
+  photoUploadRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'flex-start',
+  },
+  photoUploadBtn: {
+    backgroundColor: '#1565C0',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  photoUploadBtnText: {color: '#fff', fontWeight: '600', fontSize: 14},
+  photoUploadSuccess: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    backgroundColor: '#E8F5E9',
+    borderRadius: 8,
+    padding: 10,
+  },
+  photoUploadSuccessText: {color: '#2E7D32', fontSize: 13},
 });
 
 export default ViaDetailScreen;

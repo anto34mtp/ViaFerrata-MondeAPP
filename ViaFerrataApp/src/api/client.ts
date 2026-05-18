@@ -174,8 +174,20 @@ export const rateVia = (
 
 export const commentVia = (
   slug: string,
-  data: {content: string; author_name?: string},
+  data: {content: string; author_name?: string; turnstile_token?: string},
 ) => apiClient.post(`/vias/${slug}/comment`, data);
+
+export const uploadViaPhoto = (slug: string, photoUri: string, authorName?: string) => {
+  const filename = photoUri.split('/').pop() || 'photo.jpg';
+  const ext = (filename.split('.').pop() || 'jpg').toLowerCase();
+  const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+  const form = new FormData();
+  form.append('photo', {uri: photoUri, name: filename, type: mimeType} as any);
+  if (authorName) form.append('author_name', authorName);
+  return apiClient.post(`/vias/${slug}/photos`, form, {
+    headers: {'Content-Type': 'multipart/form-data'},
+  });
+};
 
 // Auth
 export const login = (data: {login: string; password: string}) =>
@@ -185,6 +197,7 @@ export const register = (data: {
   username: string;
   email: string;
   password: string;
+  turnstile_token?: string;
 }) =>
   apiClient.post<{token: string; user: {id: number; username: string; email: string}}>('/auth/register', data);
 

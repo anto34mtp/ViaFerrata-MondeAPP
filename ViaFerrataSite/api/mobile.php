@@ -129,6 +129,9 @@ if ($r0 === 'auth') {
 
     if ($r1 === 'register' && $method === 'POST') {
         $b = body();
+        if (!empty(TURNSTILE_SECRET_KEY) && !verifyCloudflareTurnstile($b['turnstile_token'] ?? null)) {
+            merr('Vérification anti-spam échouée. Complétez le captcha.', 422);
+        }
         $username = trim($b['username'] ?? '');
         $email    = trim($b['email'] ?? '');
         $pass     = trim($b['password'] ?? '');
@@ -340,6 +343,12 @@ if ($r0 === 'vias') {
         $jwt = JWT::fromRequest();
         $userId = $jwt ? (int)$jwt['sub'] : null;
         $b = body();
+        // Turnstile required for anonymous users when configured
+        if (!$jwt && !empty(TURNSTILE_SECRET_KEY)) {
+            if (!verifyCloudflareTurnstile($b['turnstile_token'] ?? null)) {
+                merr('Vérification anti-spam échouée. Rechargez la page.', 422);
+            }
+        }
         $content = trim($b['content'] ?? '');
         $author  = $jwt ? $jwt['username'] : trim($b['author_name'] ?? '');
         if (strlen($content) < 10 || !$author) merr('Contenu insuffisant');
@@ -347,6 +356,21 @@ if ($r0 === 'vias') {
         $ok = (new Comment())->create($via['id'], $author, $content, $userId, $hash, null, $_SERVER['REMOTE_ADDR'] ?? null);
         if (!$ok) merr('Erreur lors de la publication');
         mok(['published' => true]);
+    }
+
+    if ($r1 !== '' && $r2 === 'photos' && $method === 'POST') {
+        $via = $viaModel->getBySlug($r1);
+        if (!$via) merr('Via introuvable', 404);
+        if (!isset($_FILES['photo'])) merr('Fichier photo manquant');
+        $jwt = JWT::fromRequest();
+        $userId = $jwt ? (int)$jwt['sub'] : null;
+        $authorName = $jwt ? ($jwt['username'] ?? 'Utilisateur') : trim($_POST['author_name'] ?? 'Anonyme');
+        $visitorHash = hash('sha256', ($_SERVER['REMOTE_ADDR'] ?? '') . ($jwt ? $jwt['sub'] : 'anon'));
+        $result = (new Photo())->upload($via['id'], $_FILES['photo'], $userId, $authorName, $visitorHash, $_SERVER['REMOTE_ADDR'] ?? null);
+        if (!is_int($result) || $result <= 0) {
+            merr('Erreur lors de l\'upload photo: ' . (is_string($result) ? $result : 'unknown'));
+        }
+        mok(['photo_id' => $result, 'pending_review' => true], 201);
     }
 
     merr('Endpoint inconnu', 404);
@@ -558,6 +582,9 @@ if ($r0 === 'dashboard') {
 // ═══════════════════════════════════════════════════════════════════
 if ($r0 === 'submit' && $method === 'POST') {
     $b = body();
+    if (!empty(TURNSTILE_SECRET_KEY) && !verifyCloudflareTurnstile($b['turnstile_token'] ?? null)) {
+        merr('Vérification anti-spam échouée. Complétez le captcha.', 422);
+    }
     $name     = trim($b['name'] ?? '');
     $location = trim($b['location'] ?? '');
     if (!$name || !$location) merr('Nom et localisation requis');
