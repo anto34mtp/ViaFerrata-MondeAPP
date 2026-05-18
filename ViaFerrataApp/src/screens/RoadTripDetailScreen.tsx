@@ -1,7 +1,7 @@
 import React, {useState, useCallback} from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, Modal, TextInput,
+  Alert, Modal, TextInput, Linking, Platform,
 } from 'react-native';
 import {useFocusEffect, useRoute, useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp, NativeStackRouteProp} from '@react-navigation/native-stack';
@@ -13,6 +13,16 @@ import DifficultyBadge from '../components/DifficultyBadge';
 import {RootStackParamList} from '../navigation/AppNavigator';
 
 const PRIMARY = '#2E7D32';
+
+function openNavigation(lat: number, lng: number, name: string) {
+  const label = encodeURIComponent(name);
+  const url = Platform.OS === 'ios'
+    ? `maps://?daddr=${lat},${lng}&q=${label}`
+    : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  Linking.openURL(url).catch(() =>
+    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`),
+  );
+}
 type Route = NativeStackRouteProp<RootStackParamList, 'RoadTripDetail'>;
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -113,14 +123,23 @@ export default function RoadTripDetailScreen() {
                     onPress={() => navigation.navigate('ViaDetail', {slug: via.slug})}>
                     <Text style={styles.viaName}>{via.name}</Text>
                     {via.location ? <Text style={styles.viaLocation}>📍 {via.location}</Text> : null}
-                    {via.difficulty ? <DifficultyBadge difficulty={via.difficulty} /> : null}
+                    {via.difficulty ? <DifficultyBadge level={via.difficulty} size="small" /> : null}
                     {via.notes ? <Text style={styles.viaNotes}>{via.notes}</Text> : null}
                   </TouchableOpacity>
-                  {isOwner && (
-                    <TouchableOpacity onPress={() => handleRemoveVia(via.id, via.name)}>
-                      <Text style={styles.removeBtn}>✕</Text>
-                    </TouchableOpacity>
-                  )}
+                  <View style={styles.viaActions}>
+                    {(via.gps_lat && via.gps_lng) ? (
+                      <TouchableOpacity
+                        style={styles.navBtn}
+                        onPress={() => openNavigation(via.gps_lat, via.gps_lng, via.name)}>
+                        <Text style={styles.navBtnText}>🧭</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                    {isOwner && (
+                      <TouchableOpacity onPress={() => handleRemoveVia(via.id, via.name)}>
+                        <Text style={styles.removeBtn}>✕</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
               ))}
             </View>
@@ -181,6 +200,9 @@ const styles = StyleSheet.create({
   dayTitle: {backgroundColor: PRIMARY, color: '#fff', fontWeight: 'bold', fontSize: 15, padding: 10},
   viaCard: {flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0'},
   viaInfo: {flex: 1},
+  viaActions: {flexDirection: 'row', alignItems: 'center', gap: 8},
+  navBtn: {backgroundColor: '#1565C0', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 8},
+  navBtnText: {fontSize: 16},
   viaName: {fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 2},
   viaLocation: {color: '#666', fontSize: 13, marginBottom: 4},
   viaNotes: {color: '#888', fontSize: 12, fontStyle: 'italic', marginTop: 4},
@@ -191,7 +213,7 @@ const styles = StyleSheet.create({
   modalContent: {backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20},
   modalTitle: {fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 16},
   label: {fontSize: 13, color: '#555', marginBottom: 4, marginTop: 8},
-  input: {borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, fontSize: 15},
+  input: {borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, fontSize: 15, color: '#1A1A1A', backgroundColor: '#fff'},
   textarea: {height: 70, textAlignVertical: 'top'},
   modalActions: {flexDirection: 'row', gap: 12, marginTop: 16, marginBottom: 20},
   cancelBtn: {flex: 1, borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, alignItems: 'center'},

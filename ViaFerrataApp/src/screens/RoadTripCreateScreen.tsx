@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
   content: {padding: 20},
   title: {fontSize: 24, fontWeight: 'bold', color: '#333', marginBottom: 20},
   label: {fontSize: 13, color: '#555', marginBottom: 4, marginTop: 12, fontWeight: '500'},
-  input: {borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, fontSize: 15, backgroundColor: '#fff'},
+  input: {borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, fontSize: 15, backgroundColor: '#fff', color: '#1A1A1A'},
   textarea: {height: 80, textAlignVertical: 'top'},
   createBtn: {backgroundColor: PRIMARY, borderRadius: 10, padding: 16, alignItems: 'center', marginTop: 28},
   createBtnText: {color: '#fff', fontSize: 17, fontWeight: 'bold'},

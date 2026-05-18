@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   modalContent: {backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '90%'},
   modalTitle: {fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 16},
   label: {fontSize: 13, color: '#555', marginBottom: 4, marginTop: 8},
-  input: {borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, fontSize: 15, backgroundColor: '#fafafa'},
+  input: {borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, fontSize: 15, backgroundColor: '#fafafa', color: '#1A1A1A'},
   textarea: {height: 80, textAlignVertical: 'top'},
   modalActions: {flexDirection: 'row', gap: 12, marginTop: 20, marginBottom: 40},
   cancelBtn: {flex: 1, borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, alignItems: 'center'},

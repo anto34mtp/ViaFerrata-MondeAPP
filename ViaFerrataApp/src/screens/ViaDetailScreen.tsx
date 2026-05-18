@@ -11,6 +11,8 @@ import {
   FlatList,
   Dimensions,
   ActivityIndicator,
+  Linking,
+  Platform,
 } from 'react-native';
 import {useRoute, useNavigation} from '@react-navigation/native';
 import {WebView} from 'react-native-webview';
@@ -24,19 +26,33 @@ import {formatDuration, formatGPS} from '../utils/helpers';
 
 const {width} = Dimensions.get('window');
 
-function stripHtml(html: string | undefined | null): string {
-  if (!html) return '';
-  return html
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s{2,}/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+function openNavigation(lat: number, lng: number, name: string) {
+  const label = encodeURIComponent(name);
+  const url = Platform.OS === 'ios'
+    ? `maps://?daddr=${lat},${lng}&q=${label}`
+    : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  Linking.openURL(url).catch(() =>
+    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`),
+  );
+}
+
+function buildHtmlContent(html: string): string {
+  return `<!DOCTYPE html><html><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<style>
+  body{margin:0;padding:0;font-family:-apple-system,Roboto,sans-serif;font-size:14px;color:#444;line-height:1.7;overflow:hidden}
+  h1,h2,h3{color:#2E7D32;margin:14px 0 6px;font-size:16px}
+  h4,h5,h6{color:#333;margin:10px 0 4px;font-size:14px}
+  p{margin:0 0 10px}
+  ul,ol{margin:0 0 10px;padding-left:20px}
+  li{margin-bottom:4px}
+  strong,b{color:#333}
+  a{color:#2E7D32}
+  img{max-width:100%;height:auto}
+  hr{border:none;border-top:1px solid #eee;margin:12px 0}
+</style>
+</head><body>${html}</body></html>`;
 }
 
 function buildMiniMapHTML(lat: number, lng: number, name: string): string {
@@ -82,6 +98,10 @@ const ViaDetailScreen: React.FC = () => {
 
   // Photos state
   const [photoIndex, setPhotoIndex] = useState(0);
+
+  // Dynamic heights for HTML WebViews
+  const [descHeight, setDescHeight] = useState(120);
+  const [pricingHeight, setPricingHeight] = useState(80);
 
   const fetchVia = useCallback(async () => {
     try {
@@ -298,11 +318,20 @@ const ViaDetailScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Description */}
+      {/* Description — rendered as HTML to preserve sections and formatting */}
       {via.description ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t.viaDetail.description}</Text>
-          <Text style={styles.description}>{stripHtml(via.description)}</Text>
+          <WebView
+            source={{html: buildHtmlContent(via.description)}}
+            style={{height: descHeight}}
+            scrollEnabled={false}
+            showsVerticalScrollIndicator={false}
+            originWhitelist={['*']}
+            mixedContentMode="always"
+            injectedJavaScript="setTimeout(()=>window.ReactNativeWebView.postMessage(String(document.body.scrollHeight)),300)"
+            onMessage={e => setDescHeight(Math.max(60, Number(e.nativeEvent.data) + 8))}
+          />
         </View>
       ) : null}
 
@@ -312,7 +341,16 @@ const ViaDetailScreen: React.FC = () => {
           {via.pricing_info ? (
             <>
               <Text style={styles.cardTitle}>{t.viaDetail.pricing}</Text>
-              <Text style={styles.description}>{stripHtml(via.pricing_info)}</Text>
+              <WebView
+                source={{html: buildHtmlContent(via.pricing_info)}}
+                style={{height: pricingHeight}}
+                scrollEnabled={false}
+                showsVerticalScrollIndicator={false}
+                originWhitelist={['*']}
+                mixedContentMode="always"
+                injectedJavaScript="setTimeout(()=>window.ReactNativeWebView.postMessage(String(document.body.scrollHeight)),300)"
+                onMessage={e => setPricingHeight(Math.max(40, Number(e.nativeEvent.data) + 8))}
+              />
             </>
           ) : null}
           {via.tourism_office ? (
@@ -320,16 +358,23 @@ const ViaDetailScreen: React.FC = () => {
               <Text style={[styles.cardTitle, {marginTop: via.pricing_info ? 12 : 0}]}>
                 {t.viaDetail.tourism}
               </Text>
-              <Text style={styles.description}>{stripHtml(via.tourism_office)}</Text>
+              <Text style={styles.description}>{via.tourism_office}</Text>
             </>
           ) : null}
         </View>
       ) : null}
 
-      {/* Map */}
+      {/* Map + M'y rendre */}
       {hasLocation ? (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{t.viaDetail.location}</Text>
+          <View style={styles.cardTitleRow}>
+            <Text style={styles.cardTitle}>{t.viaDetail.location}</Text>
+            <TouchableOpacity
+              style={styles.navBtn}
+              onPress={() => openNavigation(via.gps_lat!, via.gps_lng!, via.name)}>
+              <Text style={styles.navBtnText}>🧭 M'y rendre</Text>
+            </TouchableOpacity>
+          </View>
           <WebView
             source={{html: buildMiniMapHTML(via.gps_lat!, via.gps_lng!, via.name)}}
             style={styles.map}
@@ -538,6 +583,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1A1A1A',
     marginBottom: 12,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  navBtn: {
+    backgroundColor: '#1565C0',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  navBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
   infoGrid: {
     gap: 4,

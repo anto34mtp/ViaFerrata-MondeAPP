@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useCallback} from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Alert,
@@ -7,6 +7,30 @@ import {apiClient} from '../api/client';
 import {useLang} from '../context/LangContext';
 
 const PRIMARY = '#2E7D32';
+
+// Defined outside to keep a stable component reference between renders.
+// If defined inside the component, React creates a new type on every
+// keystroke and unmounts/remounts the TextInput, dismissing the keyboard.
+interface FieldProps {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder?: string;
+  keyboardType?: any;
+  required?: boolean;
+}
+const Field: React.FC<FieldProps> = ({label, value, onChangeText, placeholder = '', keyboardType = 'default', required = false}) => (
+  <>
+    <Text style={styles.label}>{label}{required ? ' *' : ''}</Text>
+    <TextInput
+      style={styles.input}
+      placeholder={placeholder}
+      keyboardType={keyboardType}
+      value={value}
+      onChangeText={onChangeText}
+    />
+  </>
+);
 
 export default function SubmitViaScreen() {
   const {t} = useLang();
@@ -26,7 +50,7 @@ export default function SubmitViaScreen() {
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const setField = (key: string) => (v: string) => setForm(f => ({...f, [key]: v}));
+  const setField = useCallback((key: string) => (v: string) => setForm(f => ({...f, [key]: v})), []);
 
   const handleSubmit = async () => {
     if (!form.name.trim() || !form.location.trim()) {
@@ -62,67 +86,61 @@ export default function SubmitViaScreen() {
         <Text style={styles.successIcon}>✅</Text>
         <Text style={styles.successTitle}>{t('submit.successTitle')}</Text>
         <Text style={styles.successMsg}>{t('submit.successMsg')}</Text>
-        <TouchableOpacity style={styles.resetBtn} onPress={() => { setSubmitted(false); setForm({name:'',location:'',latitude:'',longitude:'',difficulty:'',duration_hours:'',approach_time:'',return_time:'',elevation_gain:'',description:'',author_email:''}); }}>
+        <TouchableOpacity
+          style={styles.resetBtn}
+          onPress={() => {
+            setSubmitted(false);
+            setForm({name:'',location:'',latitude:'',longitude:'',difficulty:'',duration_hours:'',approach_time:'',return_time:'',elevation_gain:'',description:'',author_email:''});
+          }}>
           <Text style={styles.resetBtnText}>{t('submit.another')}</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const F = ({label, field, placeholder = '', keyboardType = 'default', required = false}: any) => (
-    <>
-      <Text style={styles.label}>{label}{required ? ' *' : ''}</Text>
-      <TextInput
-        style={styles.input}
-        placeholder={placeholder}
-        keyboardType={keyboardType}
-        value={(form as any)[field]}
-        onChangeText={setField(field)}
-      />
-    </>
-  );
-
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>{t('submit.title')}</Text>
       <Text style={styles.subtitle}>{t('submit.subtitle')}</Text>
 
-      <F label={t('submit.name')} field="name" placeholder="Via Ferrata de..." required />
-      <F label={t('submit.location')} field="location" placeholder="Commune, département" required />
+      <Field label={t('submit.name')} value={form.name} onChangeText={setField('name')} placeholder="Via Ferrata de..." required />
+      <Field label={t('submit.location')} value={form.location} onChangeText={setField('location')} placeholder="Commune, département" required />
 
       <View style={styles.row}>
         <View style={styles.half}>
-          <F label="Latitude GPS" field="latitude" placeholder="45.1234" keyboardType="decimal-pad" />
+          <Field label="Latitude GPS" value={form.latitude} onChangeText={setField('latitude')} placeholder="45.1234" keyboardType="decimal-pad" />
         </View>
         <View style={styles.half}>
-          <F label="Longitude GPS" field="longitude" placeholder="6.5678" keyboardType="decimal-pad" />
+          <Field label="Longitude GPS" value={form.longitude} onChangeText={setField('longitude')} placeholder="6.5678" keyboardType="decimal-pad" />
         </View>
       </View>
 
-      <F label={t('submit.difficulty')} field="difficulty" placeholder="1-7" keyboardType="numeric" />
-      <F label={t('submit.duration')} field="duration_hours" placeholder="Ex: 2.5" keyboardType="decimal-pad" />
+      <Field label={t('submit.difficulty')} value={form.difficulty} onChangeText={setField('difficulty')} placeholder="1-7" keyboardType="numeric" />
+      <Field label={t('submit.duration')} value={form.duration_hours} onChangeText={setField('duration_hours')} placeholder="Ex: 2.5" keyboardType="decimal-pad" />
 
       <View style={styles.row}>
         <View style={styles.half}>
-          <F label={t('submit.approachTime')} field="approach_time" placeholder="min" keyboardType="numeric" />
+          <Field label={t('submit.approachTime')} value={form.approach_time} onChangeText={setField('approach_time')} placeholder="min" keyboardType="numeric" />
         </View>
         <View style={styles.half}>
-          <F label={t('submit.returnTime')} field="return_time" placeholder="min" keyboardType="numeric" />
+          <Field label={t('submit.returnTime')} value={form.return_time} onChangeText={setField('return_time')} placeholder="min" keyboardType="numeric" />
         </View>
       </View>
 
-      <F label={t('submit.elevation')} field="elevation_gain" placeholder="m" keyboardType="numeric" />
+      <Field label={t('submit.elevation')} value={form.elevation_gain} onChangeText={setField('elevation_gain')} placeholder="m" keyboardType="numeric" />
 
       <Text style={styles.label}>{t('submit.description')}</Text>
       <TextInput
         style={[styles.input, styles.textarea]}
-        multiline numberOfLines={5}
+        multiline
+        numberOfLines={5}
         placeholder={t('submit.descriptionHint')}
         value={form.description}
         onChangeText={setField('description')}
+        textAlignVertical="top"
       />
 
-      <F label={t('submit.email')} field="author_email" placeholder="votre@email.com" keyboardType="email-address" />
+      <Field label={t('submit.email')} value={form.author_email} onChangeText={setField('author_email')} placeholder="votre@email.com" keyboardType="email-address" />
 
       <TouchableOpacity
         style={[styles.submitBtn, saving && styles.disabled]}
