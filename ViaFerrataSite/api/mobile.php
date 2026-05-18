@@ -78,8 +78,8 @@ function normalizeVia(array $v): array {
         'gps_lat'               => isset($v['latitude']) && $v['latitude'] !== null ? (float)$v['latitude'] : null,
         'gps_lng'               => isset($v['longitude']) && $v['longitude'] !== null ? (float)$v['longitude'] : null,
         'opening_status'        => $v['opening_status'] ?? null,
-        'description'           => isset($v['description']) ? html_entity_decode($v['description'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
-        'pricing_info'          => isset($v['pricing']) ? html_entity_decode($v['pricing'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
+        'description'           => isset($v['description']) ? strip_tags(html_entity_decode($v['description'], ENT_QUOTES | ENT_HTML5, 'UTF-8')) : null,
+        'pricing_info'          => isset($v['pricing']) ? strip_tags(html_entity_decode($v['pricing'], ENT_QUOTES | ENT_HTML5, 'UTF-8')) : null,
         'tourism_office'        => $v['tourism_office_name'] ?? null,
         'avg_rating_general'    => isset($v['avg_general']) && $v['avg_general'] !== null ? round((float)$v['avg_general'], 1) : null,
         'avg_rating_beauty'     => isset($v['avg_beauty']) && $v['avg_beauty'] !== null ? round((float)$v['avg_beauty'], 1) : null,
@@ -396,7 +396,25 @@ if ($r0 === 'favorites') {
 
     if ($method === 'GET') {
         $status = $_GET['status'] ?? null;
-        mok($favModel->getByUser($uid, $status ?: null));
+        $rows = $favModel->getByUser($uid, $status ?: null);
+        $formatted = array_map(function($f) {
+            return [
+                'id'         => (int)($f['fav_id'] ?? $f['via_id'] ?? 0),
+                'via_id'     => (int)($f['via_id'] ?? 0),
+                'status'     => $f['status'] ?? 'to_do',
+                'created_at' => $f['fav_created_at'] ?? $f['fav_updated_at'] ?? '',
+                'via' => [
+                    'id'         => (int)($f['via_id'] ?? 0),
+                    'name'       => $f['name'] ?? ('Via #' . ($f['via_id'] ?? '?')),
+                    'slug'       => $f['slug'] ?? '',
+                    'location'   => $f['location'] ?? null,
+                    'country'    => $f['code_pays'] ?? null,
+                    'difficulty' => isset($f['difficulty']) && $f['difficulty'] !== null ? (int)$f['difficulty'] : null,
+                    'image_url'  => !empty($f['image_url']) ? normalizeUrl($f['image_url']) : null,
+                ],
+            ];
+        }, $rows);
+        mok($formatted);
     }
 
     if ($method === 'POST') {
@@ -542,10 +560,10 @@ if ($r0 === 'dashboard') {
     $recentFavs = $favModel->getByUser($uid, null);
     $recentFavsFormatted = array_map(function($f) {
         return [
-            'id'         => (int)($f['via_id'] ?? $f['id'] ?? 0),
+            'id'         => (int)($f['fav_id'] ?? $f['via_id'] ?? 0),
             'via_id'     => (int)($f['via_id'] ?? 0),
             'status'     => $f['status'] ?? 'to_do',
-            'created_at' => $f['updated_at'] ?? $f['created_at'] ?? '',
+            'created_at' => $f['fav_created_at'] ?? $f['fav_updated_at'] ?? '',
             'via' => [
                 'id'   => (int)($f['via_id'] ?? 0),
                 'name' => $f['name'] ?? ('Via #' . ($f['via_id'] ?? '?')),

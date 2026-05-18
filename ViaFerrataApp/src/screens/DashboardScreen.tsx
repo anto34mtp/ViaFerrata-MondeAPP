@@ -120,9 +120,9 @@ const DashboardScreen: React.FC = () => {
             label={t.dashboard.totalFavorites}
           />
           <StatCard
-            icon="📓"
-            value={data.stats.logbook_count || 0}
-            label={t.dashboard.totalLogbook}
+            icon="✅"
+            value={data.stats.done_count || 0}
+            label="Vias faites"
           />
           <StatCard
             icon="🗺️"

@@ -48,7 +48,7 @@ export default function TurnstileWidget({onVerify}: Props) {
       )}
       <WebView
         ref={webRef}
-        source={{html: buildHtml(TURNSTILE_SITE_KEY)}}
+        source={{html: buildHtml(TURNSTILE_SITE_KEY), baseUrl: 'https://viaferrata-monde.fr'}}
         style={[styles.webview, !ready && styles.hidden]}
         javaScriptEnabled
         originWhitelist={['*']}
