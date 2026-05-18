@@ -1,10 +1,11 @@
-import React, {useRef, useState, useEffect} from 'react';
+import React, {useRef, useState, useEffect, useCallback} from 'react';
 import {
   View,
   ActivityIndicator,
   Text,
   StyleSheet,
   Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import {WebView} from 'react-native-webview';
 import {useNavigation} from '@react-navigation/native';
@@ -28,11 +29,48 @@ const MapScreen: React.FC = () => {
       .finally(() => setHtmlReady(true));
   }, []);
 
+  // Geolocation handled on RN side — injecte les coords dans le WebView
+  const requestLocation = useCallback(async () => {
+    try {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'Localisation requise',
+            message: 'ViaFerrata Monde a besoin de votre position pour afficher les vias proches de vous.',
+            buttonPositive: 'Autoriser',
+            buttonNegative: 'Refuser',
+          },
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          webRef.current?.injectJavaScript(`locateError('Permission refusée'); true;`);
+          return;
+        }
+      }
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          webRef.current?.injectJavaScript(`setUserLocation(${lat}, ${lng}); true;`);
+        },
+        err => {
+          const msg = err.message ?? 'Erreur inconnue';
+          webRef.current?.injectJavaScript(`locateError(${JSON.stringify(msg)}); true;`);
+        },
+        {enableHighAccuracy: true, timeout: 15000, maximumAge: 60000},
+      );
+    } catch {
+      webRef.current?.injectJavaScript(`locateError('Erreur inattendue'); true;`);
+    }
+  }, []);
+
   const handleMessage = (event: {nativeEvent: {data: string}}) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
       if (msg.type === 'via' && msg.slug) {
         navigation.navigate('ViaDetail', {slug: msg.slug, name: msg.name ?? msg.slug});
+      } else if (msg.type === 'locate') {
+        requestLocation();
       }
     } catch {}
   };
@@ -54,7 +92,6 @@ const MapScreen: React.FC = () => {
         style={styles.webview}
         javaScriptEnabled
         domStorageEnabled
-        geolocationEnabled
         originWhitelist={['*']}
         onMessage={handleMessage}
         onLoadEnd={() => setWebLoading(false)}
@@ -84,7 +121,7 @@ function buildMapHTML(points: MapPoint[]): string {
     *{margin:0;padding:0;box-sizing:border-box}
     html,body,#map{width:100%;height:100%;overflow:hidden}
     #controls{position:absolute;top:56px;right:8px;z-index:1000;display:flex;flex-direction:column;gap:5px}
-    .ctrl-btn{background:white;border:1px solid rgba(0,0,0,0.25);border-radius:6px;padding:7px 11px;font-size:13px;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,0.18);font-family:sans-serif;white-space:nowrap;touch-action:manipulation}
+    .ctrl-btn{background:white;border:1px solid rgba(0,0,0,0.25);border-radius:6px;padding:7px 11px;font-size:13px;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,0.18);font-family:sans-serif;white-space:nowrap;touch-action:manipulation;user-select:none;-webkit-user-select:none}
     .ctrl-btn.active{background:#2E7D32;color:white;border-color:#2E7D32}
     #locate-btn{background:#2E7D32;color:white;border-color:#2E7D32;font-weight:700}
     .leaflet-popup-content{margin:8px 10px;font-family:sans-serif}
@@ -128,37 +165,49 @@ function buildMapHTML(points: MapPoint[]): string {
     m.bindPopup('<div style="min-width:155px"><b style="font-size:14px">'+v.name+'</b>'+diff+rat+'<br><button onclick="openVia(\\''+slug+'\\',\\''+nm+'\\');" style="margin-top:8px;background:#2E7D32;color:#fff;border:none;padding:6px 10px;border-radius:6px;width:100%;font-size:13px;cursor:pointer">Voir le détail ›</button></div>');
   });
 
-  var userMarker=null,circles={};
+  var userMarker=null,circles={},pendingKm=null;
 
-  function drawCircles(lat,lng){
-    Object.keys(circles).forEach(function(k){
-      map.removeLayer(circles[k]);
-      circles[k]=L.circle([lat,lng],{
-        radius:parseInt(k)*1000,
-        color:'#2E7D32',fillColor:'#4CAF50',fillOpacity:0.04,weight:2,dashArray:'6 10'
-      }).addTo(map);
-    });
+  function circleOptions(km){
+    return {radius:km*1000,color:'#2E7D32',fillColor:'#4CAF50',fillOpacity:0.05,weight:2,dashArray:'8 10'};
   }
 
+  // Appelé par RN via injectJavaScript quand la position est obtenue
+  window.setUserLocation=function(lat,lng){
+    document.getElementById('locate-btn').textContent='📍 Me localiser';
+    if(userMarker)map.removeLayer(userMarker);
+    userMarker=L.marker([lat,lng],{
+      icon:L.divIcon({
+        html:'<div style="width:16px;height:16px;background:#2196F3;border:3px solid #fff;border-radius:50%;box-shadow:0 0 8px rgba(33,150,243,0.7)"></div>',
+        iconSize:[16,16],iconAnchor:[8,8],className:''
+      })
+    }).addTo(map).bindPopup('Vous êtes ici');
+    map.setView([lat,lng],12);
+    // Repositionner tous les cercles déjà actifs
+    Object.keys(circles).forEach(function(k){
+      map.removeLayer(circles[k]);
+      circles[k]=L.circle([lat,lng],circleOptions(parseInt(k))).addTo(map);
+    });
+    // Dessiner un éventuel cercle en attente (bouton km cliqué avant localisation)
+    if(pendingKm!==null){
+      var pk=pendingKm; pendingKm=null;
+      circles[pk]=L.circle([lat,lng],circleOptions(pk)).addTo(map);
+      document.getElementById('r'+pk).classList.add('active');
+    }
+  };
+
+  // Appelé par RN via injectJavaScript en cas d'erreur
+  window.locateError=function(msg){
+    document.getElementById('locate-btn').textContent='📍 Me localiser';
+    alert('Localisation impossible : '+msg);
+  };
+
+  // Demande la position au côté RN (qui gère les permissions natives)
   function locateMe(){
-    if(!navigator.geolocation){alert('Géolocalisation non disponible');return;}
     document.getElementById('locate-btn').textContent='⏳ Localisation…';
-    navigator.geolocation.getCurrentPosition(function(pos){
-      var lat=pos.coords.latitude,lng=pos.coords.longitude;
+    try{window.ReactNativeWebView.postMessage(JSON.stringify({type:'locate'}));}catch(e){
       document.getElementById('locate-btn').textContent='📍 Me localiser';
-      if(userMarker)map.removeLayer(userMarker);
-      userMarker=L.marker([lat,lng],{
-        icon:L.divIcon({
-          html:'<div style="width:16px;height:16px;background:#2196F3;border:3px solid #fff;border-radius:50%;box-shadow:0 0 8px rgba(33,150,243,0.7)"></div>',
-          iconSize:[16,16],iconAnchor:[8,8],className:''
-        })
-      }).addTo(map).bindPopup('Vous êtes ici');
-      map.setView([lat,lng],10);
-      drawCircles(lat,lng);
-    },function(err){
-      document.getElementById('locate-btn').textContent='📍 Me localiser';
-      alert('Localisation impossible: '+err.message);
-    },{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+      alert('Impossible d\\'envoyer la demande de localisation');
+    }
   }
 
   function toggleRadius(km){
@@ -170,22 +219,12 @@ function buildMapHTML(points: MapPoint[]): string {
       return;
     }
     if(!userMarker){
+      pendingKm=km;
       locateMe();
-      var tries=0;
-      var wait=setInterval(function(){
-        if(userMarker||tries>30){
-          clearInterval(wait);
-          if(!userMarker)return;
-          var ll=userMarker.getLatLng();
-          circles[km]=L.circle([ll.lat,ll.lng],{radius:km*1000,color:'#2E7D32',fillColor:'#4CAF50',fillOpacity:0.04,weight:2,dashArray:'6 10'}).addTo(map);
-          btn.classList.add('active');
-        }
-        tries++;
-      },500);
       return;
     }
     var ll=userMarker.getLatLng();
-    circles[km]=L.circle([ll.lat,ll.lng],{radius:km*1000,color:'#2E7D32',fillColor:'#4CAF50',fillOpacity:0.04,weight:2,dashArray:'6 10'}).addTo(map);
+    circles[km]=L.circle([ll.lat,ll.lng],circleOptions(km)).addTo(map);
     btn.classList.add('active');
   }
 
