@@ -327,6 +327,11 @@ if ($r0 === 'vias') {
         $jwt = JWT::fromRequest();
         $userId = $jwt ? (int)$jwt['sub'] : null;
         $b = body();
+        if (!$jwt && !empty(TURNSTILE_SECRET_KEY)) {
+            if (!verifyCloudflareTurnstile($b['turnstile_token'] ?? null)) {
+                merr('Vérification anti-spam échouée.', 422);
+            }
+        }
         $rG = (float)($b['rating_general'] ?? 0);
         $rB = (float)($b['rating_beauty'] ?? 0);
         $rD = (float)($b['rating_difficulty'] ?? 0);
@@ -363,6 +368,11 @@ if ($r0 === 'vias') {
         if (!$via) merr('Via introuvable', 404);
         if (!isset($_FILES['photo'])) merr('Fichier photo manquant');
         $jwt = JWT::fromRequest();
+        if (!$jwt && !empty(TURNSTILE_SECRET_KEY)) {
+            if (!verifyCloudflareTurnstile($_POST['turnstile_token'] ?? null)) {
+                merr('Vérification anti-spam échouée.', 422);
+            }
+        }
         $userId = $jwt ? (int)$jwt['sub'] : null;
         $authorName = $jwt ? ($jwt['username'] ?? 'Utilisateur') : trim($_POST['author_name'] ?? 'Anonyme');
         $visitorHash = hash('sha256', ($_SERVER['REMOTE_ADDR'] ?? '') . ($jwt ? $jwt['sub'] : 'anon'));

@@ -26,6 +26,7 @@ const Field: React.FC<FieldProps> = ({label, value, onChangeText, placeholder = 
     <TextInput
       style={styles.input}
       placeholder={placeholder}
+      placeholderTextColor="#999"
       keyboardType={keyboardType}
       value={value}
       onChangeText={onChangeText}
@@ -138,6 +139,7 @@ export default function SubmitViaScreen() {
         multiline
         numberOfLines={5}
         placeholder={t('submit.descriptionHint')}
+        placeholderTextColor="#999"
         value={form.description}
         onChangeText={setField('description')}
         textAlignVertical="top"

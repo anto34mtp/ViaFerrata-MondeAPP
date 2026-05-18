@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Linking,
   Platform,
+  Modal,
 } from 'react-native';
 import {useRoute, useNavigation} from '@react-navigation/native';
 import {WebView} from 'react-native-webview';
@@ -99,12 +100,17 @@ const ViaDetailScreen: React.FC = () => {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [commentToken, setCommentToken] = useState<string | null>(null);
 
+  // Rating token state
+  const [ratingToken, setRatingToken] = useState<string | null>(null);
+
   // Photo upload state
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoUploadedMsg, setPhotoUploadedMsg] = useState('');
+  const [photoToken, setPhotoToken] = useState<string | null>(null);
 
-  // Photos gallery state
-  const [photoIndex, setPhotoIndex] = useState(0);
+  // Community photos lightbox state
+  const [lightboxVisible, setLightboxVisible] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   // Dynamic heights for HTML WebViews
   const [descHeight, setDescHeight] = useState(120);
@@ -175,11 +181,13 @@ const ViaDetailScreen: React.FC = () => {
         rating_general: ratingGeneral,
         rating_beauty: ratingBeauty,
         rating_difficulty: ratingDifficulty,
+        turnstile_token: ratingToken || undefined,
       });
       Alert.alert('', 'Merci pour votre évaluation !');
       setRatingGeneral(0);
       setRatingBeauty(0);
       setRatingDifficulty(0);
+      setRatingToken(null);
       fetchVia();
     } catch (e) {
       Alert.alert(t.common.error, String(e));
@@ -216,8 +224,9 @@ const ViaDetailScreen: React.FC = () => {
     setUploadingPhoto(true);
     setPhotoUploadedMsg('');
     try {
-      await uploadViaPhoto(slug, asset.uri, undefined);
+      await uploadViaPhoto(slug, asset.uri, undefined, photoToken || undefined);
       setPhotoUploadedMsg('Photo envoyée ! Elle sera visible après validation par nos modérateurs.');
+      setPhotoToken(null);
     } catch (e) {
       Alert.alert(t.common.error, 'Impossible d\'envoyer la photo.');
     } finally {
@@ -247,39 +256,8 @@ const ViaDetailScreen: React.FC = () => {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Photos / image de couverture */}
-      {photos.length > 0 ? (
-        <View>
-          <FlatList
-            data={photos}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={item => String(item.id)}
-            onMomentumScrollEnd={e => {
-              const idx = Math.round(e.nativeEvent.contentOffset.x / width);
-              setPhotoIndex(idx);
-            }}
-            renderItem={({item}) => (
-              <Image
-                source={{uri: item.url}}
-                style={{width, height: 240}}
-                resizeMode="cover"
-              />
-            )}
-          />
-          {photos.length > 1 && (
-            <View style={styles.photoDots}>
-              {photos.map((_, i) => (
-                <View
-                  key={i}
-                  style={[styles.dot, i === photoIndex && styles.dotActive]}
-                />
-              ))}
-            </View>
-          )}
-        </View>
-      ) : via.image_url ? (
+      {/* Image de couverture */}
+      {via.image_url ? (
         <Image
           source={{uri: via.image_url}}
           style={{width, height: 240}}
@@ -294,13 +272,14 @@ const ViaDetailScreen: React.FC = () => {
       {/* Photo upload button */}
       <View style={styles.photoUploadRow}>
         <TouchableOpacity
-          style={styles.photoUploadBtn}
+          style={[styles.photoUploadBtn, {opacity: uploadingPhoto || !photoToken ? 0.6 : 1}]}
           onPress={handleUploadPhoto}
-          disabled={uploadingPhoto}>
+          disabled={uploadingPhoto || !photoToken}>
           {uploadingPhoto
             ? <ActivityIndicator color="#fff" size="small" />
             : <Text style={styles.photoUploadBtnText}>📷 Proposer une photo</Text>}
         </TouchableOpacity>
+        <TurnstileWidget onVerify={tok => setPhotoToken(tok)} />
       </View>
       {!!photoUploadedMsg && (
         <View style={styles.photoUploadSuccess}>
@@ -474,10 +453,11 @@ const ViaDetailScreen: React.FC = () => {
             value={ratingDifficulty}
             onValueChange={setRatingDifficulty}
           />
+          <TurnstileWidget onVerify={tok => setRatingToken(tok)} />
           <TouchableOpacity
-            style={[styles.submitBtn, ratingGeneral === 0 && styles.submitBtnDisabled]}
+            style={[styles.submitBtn, (ratingGeneral === 0 || !ratingToken) && styles.submitBtnDisabled]}
             onPress={handleSubmitRating}
-            disabled={submittingRating || ratingGeneral === 0}>
+            disabled={submittingRating || ratingGeneral === 0 || !ratingToken}>
             {submittingRating ? (
               <ActivityIndicator color="#FFF" size="small" />
             ) : (
@@ -514,12 +494,14 @@ const ViaDetailScreen: React.FC = () => {
           <TextInput
             style={styles.input}
             placeholder={t.viaDetail.authorName}
+            placeholderTextColor="#999"
             value={authorName}
             onChangeText={setAuthorName}
           />
           <TextInput
             style={[styles.input, styles.textArea]}
             placeholder={t.viaDetail.commentPlaceholder}
+            placeholderTextColor="#999"
             value={commentText}
             onChangeText={setCommentText}
             multiline
@@ -539,6 +521,69 @@ const ViaDetailScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Photos de la communauté */}
+      {photos.length > 0 && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Photos de la communauté ({photos.length})</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {photos.map((photo, i) => (
+              <TouchableOpacity
+                key={photo.id}
+                onPress={() => { setLightboxIndex(i); setLightboxVisible(true); }}>
+                <Image
+                  source={{uri: photo.url}}
+                  style={{width: 90, height: 90, borderRadius: 8, margin: 4}}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Lightbox modal for community photos */}
+      <Modal
+        visible={lightboxVisible}
+        transparent={false}
+        animationType="fade"
+        onRequestClose={() => setLightboxVisible(false)}>
+        <View style={styles.lightboxContainer}>
+          <FlatList
+            data={photos}
+            horizontal
+            pagingEnabled
+            initialScrollIndex={lightboxIndex}
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={item => String(item.id)}
+            getItemLayout={(_, index) => ({length: width, offset: width * index, index})}
+            onMomentumScrollEnd={e => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / width);
+              setLightboxIndex(idx);
+            }}
+            renderItem={({item}) => (
+              <Image
+                source={{uri: item.url}}
+                style={{width, height: '100%'}}
+                resizeMode="contain"
+              />
+            )}
+          />
+          <TouchableOpacity
+            style={styles.lightboxClose}
+            onPress={() => setLightboxVisible(false)}>
+            <Text style={styles.lightboxCloseText}>✕</Text>
+          </TouchableOpacity>
+          <View style={styles.lightboxDots}>
+            {photos.map((_, i) => (
+              <View
+                key={i}
+                style={[styles.dot, i === lightboxIndex && styles.dotActive]}
+              />
+            ))}
+          </View>
+        </View>
+      </Modal>
 
       <View style={{height: 32}} />
     </ScrollView>
@@ -757,6 +802,36 @@ const styles = StyleSheet.create({
   textArea: {
     height: 80,
     textAlignVertical: 'top',
+  },
+  lightboxContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+  },
+  lightboxClose: {
+    position: 'absolute',
+    top: 48,
+    right: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lightboxCloseText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  lightboxDots: {
+    position: 'absolute',
+    bottom: 32,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
   },
   photoUploadRow: {
     paddingHorizontal: 12,

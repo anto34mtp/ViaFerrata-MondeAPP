@@ -162,14 +162,17 @@ export default function RoadTripDetailScreen() {
 
             <Text style={styles.label}>ID de la via *</Text>
             <TextInput style={styles.input} keyboardType="numeric" placeholder="Ex: 42"
+              placeholderTextColor="#999"
               value={addForm.via_id} onChangeText={v => setAddForm(f => ({...f, via_id: v}))} />
 
             <Text style={styles.label}>Jour *</Text>
             <TextInput style={styles.input} keyboardType="numeric" placeholder="1"
+              placeholderTextColor="#999"
               value={addForm.day_number} onChangeText={v => setAddForm(f => ({...f, day_number: v}))} />
 
             <Text style={styles.label}>Notes (optionnel)</Text>
             <TextInput style={[styles.input, styles.textarea]} multiline
+              placeholderTextColor="#999"
               value={addForm.notes} onChangeText={v => setAddForm(f => ({...f, notes: v}))} />
 
             <View style={styles.modalActions}>

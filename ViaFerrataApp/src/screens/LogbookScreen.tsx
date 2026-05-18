@@ -114,22 +114,27 @@ export default function LogbookScreen() {
 
             <Text style={styles.label}>{t('logbook.viaId')} *</Text>
             <TextInput style={styles.input} keyboardType="numeric"
+              placeholderTextColor="#999"
               value={form.via_id} onChangeText={v => setForm(f => ({...f, via_id: v}))} />
 
             <Text style={styles.label}>{t('logbook.date')} * (AAAA-MM-JJ)</Text>
             <TextInput style={styles.input} placeholder="2024-06-15"
+              placeholderTextColor="#999"
               value={form.done_date} onChangeText={v => setForm(f => ({...f, done_date: v}))} />
 
             <Text style={styles.label}>{t('logbook.conditions')}</Text>
             <TextInput style={styles.input} placeholder="Beau temps, voie sèche"
+              placeholderTextColor="#999"
               value={form.conditions} onChangeText={v => setForm(f => ({...f, conditions: v}))} />
 
             <Text style={styles.label}>{t('logbook.companion')}</Text>
             <TextInput style={styles.input} placeholder="Alice, Bob"
+              placeholderTextColor="#999"
               value={form.companion} onChangeText={v => setForm(f => ({...f, companion: v}))} />
 
             <Text style={styles.label}>{t('logbook.notes')}</Text>
             <TextInput style={[styles.input, styles.textarea]} multiline numberOfLines={4}
+              placeholderTextColor="#999"
               value={form.notes} onChangeText={v => setForm(f => ({...f, notes: v}))} />
 
             <View style={styles.modalActions}>

@@ -169,6 +169,7 @@ export const rateVia = (
     rating_general: number;
     rating_beauty: number;
     rating_difficulty: number;
+    turnstile_token?: string;
   },
 ) => apiClient.post(`/vias/${slug}/rate`, data);
 
@@ -177,13 +178,14 @@ export const commentVia = (
   data: {content: string; author_name?: string; turnstile_token?: string},
 ) => apiClient.post(`/vias/${slug}/comment`, data);
 
-export const uploadViaPhoto = (slug: string, photoUri: string, authorName?: string) => {
+export const uploadViaPhoto = (slug: string, photoUri: string, authorName?: string, turnstileToken?: string) => {
   const filename = photoUri.split('/').pop() || 'photo.jpg';
   const ext = (filename.split('.').pop() || 'jpg').toLowerCase();
   const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
   const form = new FormData();
   form.append('photo', {uri: photoUri, name: filename, type: mimeType} as any);
   if (authorName) form.append('author_name', authorName);
+  if (turnstileToken) form.append('turnstile_token', turnstileToken);
   return apiClient.post(`/vias/${slug}/photos`, form, {
     headers: {'Content-Type': 'multipart/form-data'},
   });

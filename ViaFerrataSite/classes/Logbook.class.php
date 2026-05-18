@@ -80,7 +80,6 @@ class Logbook {
                          v.image_url,
                          v.difficulty,
                          v.location,
-                         v.altitude,
                          d.name     AS department_name,
                          d.code     AS department_code
                   FROM logbook_entries le

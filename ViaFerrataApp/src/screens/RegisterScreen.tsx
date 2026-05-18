@@ -65,6 +65,7 @@ const RegisterScreen: React.FC = () => {
           <TextInput
             style={styles.input}
             placeholder={t.auth.usernamePlaceholder}
+            placeholderTextColor="#999"
             value={username}
             onChangeText={setUsername}
             autoCapitalize="none"
@@ -75,6 +76,7 @@ const RegisterScreen: React.FC = () => {
           <TextInput
             style={styles.input}
             placeholder={t.auth.emailPlaceholder}
+            placeholderTextColor="#999"
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -86,6 +88,7 @@ const RegisterScreen: React.FC = () => {
           <TextInput
             style={styles.input}
             placeholder={t.auth.passwordPlaceholder}
+            placeholderTextColor="#999"
             value={password}
             onChangeText={setPassword}
             secureTextEntry

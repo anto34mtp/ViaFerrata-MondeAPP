@@ -59,6 +59,7 @@ export default function RoadTripCreateScreen() {
       <TextInput
         style={styles.input}
         placeholder="Mon road trip Via Ferrata"
+        placeholderTextColor="#999"
         value={form.name}
         onChangeText={v => setForm(f => ({...f, name: v}))}
       />
@@ -67,6 +68,7 @@ export default function RoadTripCreateScreen() {
       <TextInput
         style={[styles.input, styles.textarea]}
         placeholder="Description de votre voyage..."
+        placeholderTextColor="#999"
         multiline
         numberOfLines={3}
         value={form.description}
@@ -77,6 +79,7 @@ export default function RoadTripCreateScreen() {
       <TextInput
         style={styles.input}
         placeholder="2024-07-01"
+        placeholderTextColor="#999"
         value={form.start_date}
         onChangeText={v => setForm(f => ({...f, start_date: v}))}
       />
@@ -85,6 +88,7 @@ export default function RoadTripCreateScreen() {
       <TextInput
         style={styles.input}
         placeholder="2024-07-07"
+        placeholderTextColor="#999"
         value={form.end_date}
         onChangeText={v => setForm(f => ({...f, end_date: v}))}
       />
@@ -94,6 +98,7 @@ export default function RoadTripCreateScreen() {
         style={styles.input}
         keyboardType="numeric"
         placeholder="3"
+        placeholderTextColor="#999"
         value={form.nb_days}
         onChangeText={v => setForm(f => ({...f, nb_days: v}))}
       />
