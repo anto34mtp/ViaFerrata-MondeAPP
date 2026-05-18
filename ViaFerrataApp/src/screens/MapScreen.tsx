@@ -14,98 +14,153 @@ import {useNavigation} from '@react-navigation/native';
 import Geolocation from '@react-native-community/geolocation';
 import {getMapVias, MapPoint} from '../api/client';
 
-Geolocation.setRNConfiguration({
-  skipPermissionRequests: true,
-  authorizationLevel: 'whenInUse',
-});
-
 const MapScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const webRef = useRef<WebView>(null);
   const [webLoading, setWebLoading] = useState(true);
   const [points, setPoints] = useState<MapPoint[]>([]);
   const [htmlReady, setHtmlReady] = useState(false);
+  const permissionGranted = useRef(false);
 
   useEffect(() => {
     getMapVias()
       .then(res => {
         const raw = res.data as any;
-        const body = (raw && typeof raw === 'object' && 'ok' in raw && 'data' in raw) ? raw.data : raw;
+        const body =
+          raw && typeof raw === 'object' && 'ok' in raw && 'data' in raw
+            ? raw.data
+            : raw;
         setPoints(Array.isArray(body) ? body : []);
       })
       .catch(() => setPoints([]))
       .finally(() => setHtmlReady(true));
   }, []);
 
+  // Ask for location permission as soon as the map screen opens (Android only).
+  // This ensures the system dialog appears on first visit rather than only when
+  // the user presses the locate button, where a stale "never ask again" state
+  // would silently swallow the request.
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      permissionGranted.current = true;
+      return;
+    }
+    (async () => {
+      const perm = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
+
+      const already = await PermissionsAndroid.check(perm);
+      if (already) {
+        permissionGranted.current = true;
+        return;
+      }
+
+      const result = await PermissionsAndroid.request(perm, {
+        title: 'Localisation requise',
+        message:
+          'ViaFerrata Monde a besoin de votre position pour afficher les vias proches de vous.',
+        buttonPositive: 'Autoriser',
+        buttonNegative: 'Plus tard',
+      });
+
+      if (result === PermissionsAndroid.RESULTS.GRANTED) {
+        permissionGranted.current = true;
+      } else if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+        Alert.alert(
+          'Permission GPS bloquée',
+          "La localisation a été refusée définitivement. Activez-la dans les paramètres de l'application.",
+          [
+            {text: 'Annuler', style: 'cancel'},
+            {
+              text: 'Ouvrir les paramètres',
+              onPress: () => Linking.openSettings(),
+            },
+          ],
+        );
+      }
+    })();
+  }, []);
+
   const getPosition = useCallback(() => {
     Geolocation.getCurrentPosition(
       pos => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        webRef.current?.injectJavaScript(`setUserLocation(${lat}, ${lng}); true;`);
+        const {latitude: lat, longitude: lng} = pos.coords;
+        webRef.current?.injectJavaScript(
+          `setUserLocation(${lat}, ${lng}); true;`,
+        );
       },
       err => {
         const msg = err.message ?? 'Erreur inconnue';
-        webRef.current?.injectJavaScript(`locateError(${JSON.stringify(msg)}); true;`);
+        webRef.current?.injectJavaScript(
+          `locateError(${JSON.stringify(msg)}); true;`,
+        );
+        Alert.alert('GPS indisponible', msg);
       },
       {enableHighAccuracy: true, timeout: 15000, maximumAge: 60000},
     );
   }, []);
 
-  // Geolocation handled on RN side — injecte les coords dans le WebView
+  // Called from the WebView when the user taps "Me localiser" or a km button.
+  // Re-checks permission each time so granting via Settings is picked up.
   const requestLocation = useCallback(async () => {
-    try {
-      if (Platform.OS === 'android') {
-        const perm = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
-        const current = await PermissionsAndroid.check(perm);
+    if (Platform.OS === 'android') {
+      const perm = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
+      const granted = await PermissionsAndroid.check(perm);
+      permissionGranted.current = granted;
 
-        if (current) {
-          // Already granted — go straight to position
-          getPosition();
-          return;
-        }
-
+      if (!granted) {
+        // Try requesting one more time (covers the case where the user was
+        // shown the dialog earlier but chose "Plus tard").
         const result = await PermissionsAndroid.request(perm, {
           title: 'Localisation requise',
-          message: 'ViaFerrata Monde a besoin de votre position pour afficher les vias proches de vous.',
+          message:
+            'ViaFerrata Monde a besoin de votre position pour afficher les vias proches de vous.',
           buttonPositive: 'Autoriser',
           buttonNegative: 'Refuser',
         });
 
         if (result === PermissionsAndroid.RESULTS.GRANTED) {
+          permissionGranted.current = true;
           getPosition();
-        } else if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
-          webRef.current?.injectJavaScript(`locateError('Permission refusée'); true;`);
-          Alert.alert(
-            'Permission GPS refusée',
-            'Vous avez bloqué la localisation. Activez-la dans les paramètres de l\'application.',
-            [
-              {text: 'Annuler', style: 'cancel'},
-              {text: 'Ouvrir les paramètres', onPress: () => Linking.openSettings()},
-            ],
-          );
         } else {
-          webRef.current?.injectJavaScript(`locateError('Permission refusée'); true;`);
+          webRef.current?.injectJavaScript(
+            `locateError('Permission GPS refusée'); true;`,
+          );
+          if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+            Alert.alert(
+              'Permission GPS bloquée',
+              "Activez la localisation dans les paramètres de l'application.",
+              [
+                {text: 'Annuler', style: 'cancel'},
+                {
+                  text: 'Ouvrir les paramètres',
+                  onPress: () => Linking.openSettings(),
+                },
+              ],
+            );
+          }
         }
-      } else {
-        // iOS: Geolocation.requestAuthorization() handled internally
-        getPosition();
+        return;
       }
-    } catch {
-      webRef.current?.injectJavaScript(`locateError('Erreur inattendue'); true;`);
     }
+    getPosition();
   }, [getPosition]);
 
-  const handleMessage = (event: {nativeEvent: {data: string}}) => {
-    try {
-      const msg = JSON.parse(event.nativeEvent.data);
-      if (msg.type === 'via' && msg.slug) {
-        navigation.navigate('ViaDetail', {slug: msg.slug, name: msg.name ?? msg.slug});
-      } else if (msg.type === 'locate') {
-        requestLocation();
-      }
-    } catch {}
-  };
+  const handleMessage = useCallback(
+    (event: {nativeEvent: {data: string}}) => {
+      try {
+        const msg = JSON.parse(event.nativeEvent.data);
+        if (msg.type === 'via' && msg.slug) {
+          navigation.navigate('ViaDetail', {
+            slug: msg.slug,
+            name: msg.name ?? msg.slug,
+          });
+        } else if (msg.type === 'locate') {
+          requestLocation();
+        }
+      } catch {}
+    },
+    [navigation, requestLocation],
+  );
 
   if (!htmlReady) {
     return (
@@ -191,10 +246,9 @@ function buildMapHTML(points: MapPoint[]): string {
       weight:1.5,opacity:1,fillOpacity:0.88
     }).addTo(map);
     var diff=v.difficulty?'<br><small style="color:#666">Difficulté: '+v.difficulty+'/10</small>':'';
-    var rat=v.avg_overall?'<br><small style="color:#666">⭐ '+v.avg_overall+'</small>':'';
     var slug=(v.slug||'').replace(/\\\\/g,'\\\\\\\\').replace(/'/g,"\\\\'");
     var nm=(v.name||'').replace(/\\\\/g,'\\\\\\\\').replace(/'/g,"\\\\'");
-    m.bindPopup('<div style="min-width:155px"><b style="font-size:14px">'+v.name+'</b>'+diff+rat+'<br><button onclick="openVia(\\''+slug+'\\',\\''+nm+'\\');" style="margin-top:8px;background:#2E7D32;color:#fff;border:none;padding:6px 10px;border-radius:6px;width:100%;font-size:13px;cursor:pointer">Voir le détail ›</button></div>');
+    m.bindPopup('<div style="min-width:155px"><b style="font-size:14px">'+v.name+'</b>'+diff+'<br><button onclick="openVia(\\''+slug+'\\',\\''+nm+'\\');" style="margin-top:8px;background:#2E7D32;color:#fff;border:none;padding:6px 10px;border-radius:6px;width:100%;font-size:13px;cursor:pointer">Voir le détail ›</button></div>');
   });
 
   var userMarker=null,circles={},pendingKm=null;
@@ -203,7 +257,6 @@ function buildMapHTML(points: MapPoint[]): string {
     return {radius:km*1000,color:'#2E7D32',fillColor:'#4CAF50',fillOpacity:0.05,weight:2,dashArray:'8 10'};
   }
 
-  // Appelé par RN via injectJavaScript quand la position est obtenue
   window.setUserLocation=function(lat,lng){
     document.getElementById('locate-btn').textContent='📍 Me localiser';
     if(userMarker)map.removeLayer(userMarker);
@@ -214,12 +267,10 @@ function buildMapHTML(points: MapPoint[]): string {
       })
     }).addTo(map).bindPopup('Vous êtes ici');
     map.setView([lat,lng],12);
-    // Repositionner tous les cercles déjà actifs
     Object.keys(circles).forEach(function(k){
       map.removeLayer(circles[k]);
       circles[k]=L.circle([lat,lng],circleOptions(parseInt(k))).addTo(map);
     });
-    // Dessiner un éventuel cercle en attente (bouton km cliqué avant localisation)
     if(pendingKm!==null){
       var pk=pendingKm; pendingKm=null;
       circles[pk]=L.circle([lat,lng],circleOptions(pk)).addTo(map);
@@ -227,18 +278,14 @@ function buildMapHTML(points: MapPoint[]): string {
     }
   };
 
-  // Appelé par RN via injectJavaScript en cas d'erreur
   window.locateError=function(msg){
     document.getElementById('locate-btn').textContent='📍 Me localiser';
-    alert('Localisation impossible : '+msg);
   };
 
-  // Demande la position au côté RN (qui gère les permissions natives)
   function locateMe(){
     document.getElementById('locate-btn').textContent='⏳ Localisation…';
     try{window.ReactNativeWebView.postMessage(JSON.stringify({type:'locate'}));}catch(e){
       document.getElementById('locate-btn').textContent='📍 Me localiser';
-      alert('Impossible d\\'envoyer la demande de localisation');
     }
   }
 
