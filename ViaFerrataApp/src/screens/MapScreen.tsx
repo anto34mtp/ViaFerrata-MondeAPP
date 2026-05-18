@@ -281,14 +281,32 @@ function buildMapHTML(points: MapPoint[]): string {
 
   VIAS.forEach(function(v){
     if(!v.gps_lat||!v.gps_lng)return;
+    var slug = v.slug || '';
+    var name = v.name || '';
     var m=L.circleMarker([v.gps_lat,v.gps_lng],{
       radius:9,fillColor:diffColor(v.difficulty),color:'#fff',
       weight:2,opacity:1,fillOpacity:0.9
     });
     var diff=v.difficulty?'<br><small style="color:#666">Difficulté: '+v.difficulty+'/10</small>':'';
-    var slug=(v.slug||'').replace(/\\\\/g,'\\\\\\\\').replace(/'/g,"\\\\'");
-    var nm=(v.name||'').replace(/\\\\/g,'\\\\\\\\').replace(/'/g,"\\\\'");
-    m.bindPopup('<div style="min-width:155px"><b style="font-size:14px">'+v.name+'</b>'+diff+'<br><button onclick="openVia(\\''+slug+'\\',\\''+nm+'\\');" style="margin-top:8px;background:#2E7D32;color:#fff;border:none;padding:6px 10px;border-radius:6px;width:100%;font-size:13px;cursor:pointer">Voir le détail ›</button></div>');
+    m.bindPopup(
+      '<div style="min-width:155px">'+
+      '<b style="font-size:14px">'+name+'</b>'+diff+
+      '<br><button class="via-btn" style="margin-top:8px;background:#2E7D32;color:#fff;border:none;padding:6px 10px;border-radius:6px;width:100%;font-size:13px;cursor:pointer;">Voir le détail ›</button>'+
+      '</div>'
+    );
+    m.on('popupopen', function(e){
+      var el = e.popup.getElement();
+      if(!el) return;
+      var btn = el.querySelector('.via-btn');
+      if(!btn) return;
+      ['click','touchend'].forEach(function(evtName){
+        btn.addEventListener(evtName, function(ev){
+          ev.preventDefault();
+          ev.stopPropagation();
+          openVia(slug, name);
+        });
+      });
+    });
     cluster.addLayer(m);
   });
   map.addLayer(cluster);
