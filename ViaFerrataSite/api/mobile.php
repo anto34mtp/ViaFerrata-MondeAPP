@@ -78,8 +78,8 @@ function normalizeVia(array $v): array {
         'gps_lat'               => isset($v['latitude']) && $v['latitude'] !== null ? (float)$v['latitude'] : null,
         'gps_lng'               => isset($v['longitude']) && $v['longitude'] !== null ? (float)$v['longitude'] : null,
         'opening_status'        => $v['opening_status'] ?? null,
-        'description'           => isset($v['description']) ? strip_tags(html_entity_decode($v['description'], ENT_QUOTES | ENT_HTML5, 'UTF-8')) : null,
-        'pricing_info'          => isset($v['pricing']) ? strip_tags(html_entity_decode($v['pricing'], ENT_QUOTES | ENT_HTML5, 'UTF-8')) : null,
+        'description'           => isset($v['description']) ? html_entity_decode($v['description'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
+        'pricing_info'          => isset($v['pricing']) ? html_entity_decode($v['pricing'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
         'tourism_office'        => $v['tourism_office_name'] ?? null,
         'avg_rating_general'    => isset($v['avg_general']) && $v['avg_general'] !== null ? round((float)$v['avg_general'], 1) : null,
         'avg_rating_beauty'     => isset($v['avg_beauty']) && $v['avg_beauty'] !== null ? round((float)$v['avg_beauty'], 1) : null,
@@ -618,26 +618,34 @@ if ($r0 === 'submit' && $method === 'POST') {
     $location = trim($b['location'] ?? '');
     if (!$name || !$location) merr('Nom et localisation requis');
 
-    $db = Database::getInstance();
-    $db->insert(
-        "INSERT INTO vias (name, location, latitude, longitude, difficulty, duration_hours,
-                           approach_time, return_time, elevation_gain, description,
-                           submitted_by, is_active, is_approved, created_at, updated_at)
-         VALUES (:name,:location,:lat,:lng,:diff,:dur,:app,:ret,:elev,:desc,:email,0,0,NOW(),NOW())",
-        [
-            ':name'     => $name,
-            ':location' => $location,
-            ':lat'      => isset($b['latitude'])      ? (float)$b['latitude']      : null,
-            ':lng'      => isset($b['longitude'])     ? (float)$b['longitude']     : null,
-            ':diff'     => isset($b['difficulty'])    ? (int)$b['difficulty']      : null,
-            ':dur'      => isset($b['duration_hours'])? (float)$b['duration_hours']: null,
-            ':app'      => isset($b['approach_time']) ? (int)$b['approach_time']   : null,
-            ':ret'      => isset($b['return_time'])   ? (int)$b['return_time']     : null,
-            ':elev'     => isset($b['elevation_gain'])? (int)$b['elevation_gain']  : null,
-            ':desc'     => trim($b['description'] ?? '') ?: null,
-            ':email'    => trim($b['author_email'] ?? '') ?: null,
-        ]
-    );
+    $viaModel = new ViaFerrata();
+
+    // Generate unique slug
+    $slug = $viaModel->generateSlug($name);
+    $db   = Database::getInstance();
+    $base = $slug; $i = 1;
+    while ($db->fetchOne("SELECT id FROM vias WHERE slug = :s", [':s' => $slug])) {
+        $slug = $base . '-' . $i++;
+    }
+
+    $newId = $viaModel->create([
+        'name'                  => $name,
+        'slug'                  => $slug,
+        'location'              => $location,
+        'latitude'              => isset($b['latitude'])       ? (float)$b['latitude']       : null,
+        'longitude'             => isset($b['longitude'])      ? (float)$b['longitude']      : null,
+        'difficulty'            => isset($b['difficulty'])     ? (int)$b['difficulty']       : 1,
+        'duration_hours'        => isset($b['duration_hours']) ? (float)$b['duration_hours'] : null,
+        'approach_time'         => isset($b['approach_time'])  ? (int)$b['approach_time']    : null,
+        'return_time'           => isset($b['return_time'])    ? (int)$b['return_time']      : null,
+        'elevation_gain'        => isset($b['elevation_gain']) ? (int)$b['elevation_gain']   : null,
+        'description'           => trim($b['description'] ?? '') ?: null,
+        'tourism_office_email'  => trim($b['author_email'] ?? '') ?: null,
+        'submitted_by'          => $jwtSubmit ? (int)$jwtSubmit['sub'] : null,
+        'is_approved'           => 0,
+    ]);
+
+    if (!$newId) merr('Erreur lors de l\'envoi de la proposition', 500);
     mok(['submitted' => true], 201);
 }
 
