@@ -213,7 +213,7 @@ Set-Location $AppDir
 # Si non, supprimer node_modules et reinstaller (evite les caches de versions trop neuves).
 $ExpectedVersions = @{
     "react-native-maps"    = "1.10.3"
-    "react-native-screens" = "3.29.0"
+    "react-native-screens" = "3.31.0"
 }
 $NeedsReinstall = $false
 if (Test-Path "node_modules") {
