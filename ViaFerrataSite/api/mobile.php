@@ -609,26 +609,26 @@ if ($r0 === 'dashboard') {
 // SUBMIT  (public — via proposal)
 // ═══════════════════════════════════════════════════════════════════
 if ($r0 === 'submit' && $method === 'POST') {
-    $b = body();
-    $jwtSubmit = JWT::fromRequest();
-    if (!$jwtSubmit && !empty(TURNSTILE_SECRET_KEY) && !verifyCloudflareTurnstile($b['turnstile_token'] ?? null)) {
-        merr('Vérification anti-spam échouée. Complétez le captcha.', 422);
-    }
-    $name     = trim($b['name'] ?? '');
-    $location = trim($b['location'] ?? '');
-    if (!$name || !$location) merr('Nom et localisation requis');
-
-    $viaModel = new ViaFerrata();
-
-    // Generate unique slug
-    $slug = $viaModel->generateSlug($name);
-    $db   = Database::getInstance();
-    $base = $slug; $i = 1;
-    while ($db->fetchOne("SELECT id FROM vias WHERE slug = :s", [':s' => $slug])) {
-        $slug = $base . '-' . $i++;
-    }
-
     try {
+        $b = body();
+        $jwtSubmit = JWT::fromRequest();
+        if (!$jwtSubmit && !empty(TURNSTILE_SECRET_KEY) && !verifyCloudflareTurnstile($b['turnstile_token'] ?? null)) {
+            merr('Vérification anti-spam échouée. Complétez le captcha.', 422);
+        }
+        $name     = trim($b['name'] ?? '');
+        $location = trim($b['location'] ?? '');
+        if (!$name || !$location) merr('Nom et localisation requis');
+
+        $viaModel = new ViaFerrata();
+
+        // Generate unique slug
+        $slug = $viaModel->generateSlug($name);
+        $db   = Database::getInstance();
+        $base = $slug; $i = 1;
+        while ($db->fetchOne("SELECT id FROM vias WHERE slug = :s", [':s' => $slug])) {
+            $slug = $base . '-' . $i++;
+        }
+
         $db->insert(
             "INSERT INTO vias (name, slug, location, latitude, longitude, difficulty,
                                duration_hours, approach_time, return_time, elevation_gain,
@@ -653,8 +653,8 @@ if ($r0 === 'submit' && $method === 'POST') {
         );
         mok(['submitted' => true], 201);
     } catch (Throwable $e) {
-        error_log('[submit via] ' . $e->getMessage());
-        merr('Erreur lors de l\'envoi : ' . $e->getMessage(), 500);
+        error_log('[submit via] ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+        merr('Erreur: ' . $e->getMessage(), 500);
     }
 }
 
