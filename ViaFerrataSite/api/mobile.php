@@ -677,4 +677,6 @@ if ($r0 === '') {
     ]);
 }
 
+merr('Route non trouvée : ' . $method . ' /' . $r0, 404);
+
 merr('Endpoint inconnu', 404);

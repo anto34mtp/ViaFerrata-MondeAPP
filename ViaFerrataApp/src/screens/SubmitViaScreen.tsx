@@ -79,8 +79,9 @@ export default function SubmitViaScreen() {
         turnstile_token: turnstileToken || undefined,
       });
       setSubmitted(true);
-    } catch {
-      Alert.alert(t('common.error'), t('submit.error'));
+    } catch (err: any) {
+      const serverMsg = err?.response?.data?.msg || err?.message || t('submit.error');
+      Alert.alert(t('common.error'), serverMsg);
     } finally {
       setSaving(false);
     }
