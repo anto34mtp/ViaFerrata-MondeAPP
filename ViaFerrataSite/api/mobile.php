@@ -628,25 +628,34 @@ if ($r0 === 'submit' && $method === 'POST') {
         $slug = $base . '-' . $i++;
     }
 
-    $newId = $viaModel->create([
-        'name'                  => $name,
-        'slug'                  => $slug,
-        'location'              => $location,
-        'latitude'              => isset($b['latitude'])       ? (float)$b['latitude']       : null,
-        'longitude'             => isset($b['longitude'])      ? (float)$b['longitude']      : null,
-        'difficulty'            => isset($b['difficulty'])     ? (int)$b['difficulty']       : 1,
-        'duration_hours'        => isset($b['duration_hours']) ? (float)$b['duration_hours'] : null,
-        'approach_time'         => isset($b['approach_time'])  ? (int)$b['approach_time']    : null,
-        'return_time'           => isset($b['return_time'])    ? (int)$b['return_time']      : null,
-        'elevation_gain'        => isset($b['elevation_gain']) ? (int)$b['elevation_gain']   : null,
-        'description'           => trim($b['description'] ?? '') ?: null,
-        'tourism_office_email'  => trim($b['author_email'] ?? '') ?: null,
-        'submitted_by'          => $jwtSubmit ? (int)$jwtSubmit['sub'] : null,
-        'is_approved'           => 0,
-    ]);
-
-    if (!$newId) merr('Erreur lors de l\'envoi de la proposition', 500);
-    mok(['submitted' => true], 201);
+    try {
+        $db->insert(
+            "INSERT INTO vias (name, slug, location, latitude, longitude, difficulty,
+                               duration_hours, approach_time, return_time, elevation_gain,
+                               description, submitted_by, is_active, is_approved,
+                               created_at, updated_at)
+             VALUES (:name, :slug, :location, :lat, :lng, :diff, :dur, :app, :ret, :elev,
+                     :desc, :submitted_by, 0, 0, NOW(), NOW())",
+            [
+                ':name'         => $name,
+                ':slug'         => $slug,
+                ':location'     => $location,
+                ':lat'          => isset($b['latitude'])       ? (float)$b['latitude']       : null,
+                ':lng'          => isset($b['longitude'])      ? (float)$b['longitude']      : null,
+                ':diff'         => isset($b['difficulty'])     ? (int)$b['difficulty']       : null,
+                ':dur'          => isset($b['duration_hours']) ? (float)$b['duration_hours'] : null,
+                ':app'          => isset($b['approach_time'])  ? (int)$b['approach_time']    : null,
+                ':ret'          => isset($b['return_time'])    ? (int)$b['return_time']      : null,
+                ':elev'         => isset($b['elevation_gain']) ? (int)$b['elevation_gain']   : null,
+                ':desc'         => trim($b['description'] ?? '') ?: null,
+                ':submitted_by' => $jwtSubmit ? (int)$jwtSubmit['sub'] : null,
+            ]
+        );
+        mok(['submitted' => true], 201);
+    } catch (Throwable $e) {
+        error_log('[submit via] ' . $e->getMessage());
+        merr('Erreur lors de l\'envoi : ' . $e->getMessage(), 500);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════
