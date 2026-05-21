@@ -4,6 +4,7 @@ import {
   ScrollView, Alert,
 } from 'react-native';
 import {apiClient} from '../api/client';
+import {useAuth} from '../context/AuthContext';
 import {useLang} from '../context/LangContext';
 import TurnstileWidget from '../components/TurnstileWidget';
 
@@ -36,6 +37,7 @@ const Field: React.FC<FieldProps> = ({label, value, onChangeText, placeholder = 
 
 export default function SubmitViaScreen() {
   const {t} = useLang();
+  const {user} = useAuth();
   const [form, setForm] = useState({
     name: '',
     location: '',
@@ -147,12 +149,12 @@ export default function SubmitViaScreen() {
 
       <Field label={t('submit.email')} value={form.author_email} onChangeText={setField('author_email')} placeholder="votre@email.com" keyboardType="email-address" />
 
-      <TurnstileWidget onVerify={token => setTurnstileToken(token)} />
+      {!user && <TurnstileWidget onVerify={token => setTurnstileToken(token)} />}
 
       <TouchableOpacity
-        style={[styles.submitBtn, (saving || !turnstileToken) && styles.disabled]}
+        style={[styles.submitBtn, (saving || (!user && !turnstileToken)) && styles.disabled]}
         onPress={handleSubmit}
-        disabled={saving || !turnstileToken}>
+        disabled={saving || (!user && !turnstileToken)}>
         <Text style={styles.submitBtnText}>{saving ? '...' : t('submit.submit')}</Text>
       </TouchableOpacity>
     </ScrollView>

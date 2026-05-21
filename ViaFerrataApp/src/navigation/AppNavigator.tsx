@@ -2,6 +2,7 @@ import React from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useAuth} from '../context/AuthContext';
 import {useLang} from '../context/LangContext';
 
@@ -49,13 +50,14 @@ const PRIMARY = '#2E7D32';
 function HomeTabs() {
   const {t} = useLang();
   const {user} = useAuth();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
       screenOptions={({route}) => ({
         tabBarActiveTintColor: PRIMARY,
         tabBarInactiveTintColor: '#888',
-        tabBarStyle: {paddingBottom: 4},
+        tabBarStyle: {paddingBottom: insets.bottom > 0 ? insets.bottom : 4},
         headerStyle: {backgroundColor: PRIMARY},
         headerTintColor: '#fff',
         headerTitleStyle: {fontWeight: 'bold'},
