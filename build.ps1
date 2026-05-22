@@ -213,7 +213,7 @@ Set-Location $AppDir
 # Si non, supprimer node_modules et reinstaller (evite les caches de versions trop neuves).
 $ExpectedVersions = @{
     "react-native-maps"    = "1.10.3"
-    "react-native-screens" = "3.29.0"
+    "react-native-screens" = "3.31.0"
 }
 $NeedsReinstall = $false
 if (Test-Path "node_modules") {
@@ -235,6 +235,13 @@ if ($NeedsReinstall) {
     Write-Warn "Suppression de node_modules pour reinstallation propre..."
     Remove-Item -Recurse -Force "node_modules" -ErrorAction SilentlyContinue
     if (Test-Path "package-lock.json") { Remove-Item -Force "package-lock.json" }
+}
+
+# react-native-screens 3.31+ necessite react-native-builder-bob pour son script prepare
+if (-not (Test-Command "bob")) {
+    Write-Info "Installation globale de react-native-builder-bob (requis par react-native-screens)..."
+    & npm.cmd install -g react-native-builder-bob
+    Refresh-Path
 }
 
 if (-not (Test-Path "node_modules")) {
