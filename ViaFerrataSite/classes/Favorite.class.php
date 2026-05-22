@@ -99,8 +99,12 @@ class Favorite {
     public function getByUser(int $userId, ?string $status = null): array {
         $statusCondition = $status ? "AND f.status = :status" : "";
 
-        $query = "SELECT f.*, v.*, d.name as department_name, d.code as department_code,
-                  vrs.total_ratings, vrs.avg_general, vrs.avg_beauty, vrs.avg_difficulty, vrs.avg_overall
+        // Explicit aliases to avoid column-name collisions between favorites (f) and vias (v)
+        $query = "SELECT f.id AS fav_id, f.via_id, f.status, f.user_id,
+                         f.created_at AS fav_created_at, f.updated_at AS fav_updated_at,
+                         v.name, v.slug, v.location, v.code_pays, v.difficulty, v.image_url,
+                         d.name AS department_name, d.code AS department_code,
+                         vrs.total_ratings, vrs.avg_general, vrs.avg_beauty, vrs.avg_difficulty, vrs.avg_overall
                   FROM favorites f
                   INNER JOIN vias v ON f.via_id = v.id
                   LEFT JOIN departments d ON v.department_id = d.code

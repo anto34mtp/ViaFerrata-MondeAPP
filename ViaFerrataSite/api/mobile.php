@@ -15,10 +15,22 @@ header('Access-Control-Allow-Headers: Authorization, Content-Type');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
+// Catch any uncaught exception/error and return JSON instead of HTML error page
+set_exception_handler(function (Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'msg' => 'Erreur serveur', 'debug' => ENVIRONMENT === 'development' ? $e->getMessage() : null]);
+    exit;
+});
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function mok(mixed $data = null, int $code = 200): void {
     http_response_code($code);
-    echo json_encode(['ok' => true, 'data' => $data]);
+    $flags = JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE;
+    $json  = json_encode(['ok' => true, 'data' => $data], $flags);
+    if ($json === false) {
+        $json = json_encode(['ok' => true, 'data' => $data], $flags | JSON_PARTIAL_OUTPUT_ON_ERROR);
+    }
+    echo $json;
     exit;
 }
 function merr(string $msg, int $code = 400): void {
@@ -46,6 +58,35 @@ function normalizeUrl(string $url): string {
         $url = 'https://viaferrata-monde.fr/' . ltrim($url, '/');
     }
     return $url;
+}
+
+// Normalise les noms de colonnes DB vers les champs attendus par l'app mobile
+function normalizeVia(array $v): array {
+    return [
+        'id'                    => (int)($v['id'] ?? 0),
+        'slug'                  => $v['slug'] ?? '',
+        'name'                  => $v['name'] ?? '',
+        'location'              => $v['location'] ?? null,
+        'department_name'       => $v['department_name'] ?? null,
+        'department_code'       => $v['department_code'] ?? null,
+        'country'               => $v['code_pays'] ?? $v['country'] ?? null,
+        'difficulty'            => isset($v['difficulty']) && $v['difficulty'] !== null ? (int)$v['difficulty'] : null,
+        'duration_min'          => isset($v['duration_hours']) && $v['duration_hours'] !== null ? (int)$v['duration_hours'] : null,
+        'length_m'              => isset($v['length_meters']) && $v['length_meters'] !== null ? (int)$v['length_meters'] : null,
+        'elevation_m'           => isset($v['elevation_gain']) && $v['elevation_gain'] !== null ? (int)$v['elevation_gain'] : null,
+        'altitude_max_m'        => isset($v['altitude_max']) && $v['altitude_max'] !== null ? (int)$v['altitude_max'] : null,
+        'gps_lat'               => isset($v['latitude']) && $v['latitude'] !== null ? (float)$v['latitude'] : null,
+        'gps_lng'               => isset($v['longitude']) && $v['longitude'] !== null ? (float)$v['longitude'] : null,
+        'opening_status'        => $v['opening_status'] ?? null,
+        'description'           => isset($v['description']) ? html_entity_decode($v['description'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
+        'pricing_info'          => isset($v['pricing']) ? html_entity_decode($v['pricing'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
+        'tourism_office'        => $v['tourism_office_name'] ?? null,
+        'avg_rating_general'    => isset($v['avg_general']) && $v['avg_general'] !== null ? round((float)$v['avg_general'], 1) : null,
+        'avg_rating_beauty'     => isset($v['avg_beauty']) && $v['avg_beauty'] !== null ? round((float)$v['avg_beauty'], 1) : null,
+        'avg_rating_difficulty' => isset($v['avg_difficulty']) && $v['avg_difficulty'] !== null ? round((float)$v['avg_difficulty'], 1) : null,
+        'ratings_count'         => isset($v['total_ratings']) && $v['total_ratings'] !== null ? (int)$v['total_ratings'] : null,
+        'image_url'             => !empty($v['image_url']) ? normalizeUrl($v['image_url']) : null,
+    ];
 }
 
 // ── Routing ───────────────────────────────────────────────────────────────────
@@ -88,6 +129,9 @@ if ($r0 === 'auth') {
 
     if ($r1 === 'register' && $method === 'POST') {
         $b = body();
+        if (!empty(TURNSTILE_SECRET_KEY) && !verifyCloudflareTurnstile($b['turnstile_token'] ?? null)) {
+            merr('Vérification anti-spam échouée. Complétez le captcha.', 422);
+        }
         $username = trim($b['username'] ?? '');
         $email    = trim($b['email'] ?? '');
         $pass     = trim($b['password'] ?? '');
@@ -123,48 +167,130 @@ if ($r0 === 'vias') {
 
     if ($r1 === 'top-rated' && $method === 'GET') {
         $limit = min(50, max(1, (int)($_GET['limit'] ?? 20)));
-        mok($viaModel->getTopRated($limit));
+        try {
+            $rows = $viaModel->getTopRated($limit);
+            mok(array_map('normalizeVia', $rows));
+        } catch (Throwable $e) {
+            try {
+                $stmt = $db->getConnection()->prepare(
+                    "SELECT v.*, d.name as department_name, d.code as department_code
+                     FROM vias v
+                     LEFT JOIN departments d ON v.department_id = d.code
+                     WHERE v.is_active = 1
+                     ORDER BY v.created_at DESC LIMIT :limit"
+                );
+                $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+                $stmt->execute();
+                mok(array_map('normalizeVia', $stmt->fetchAll()));
+            } catch (Throwable $e2) {
+                mok([]);
+            }
+        }
     }
 
     // Endpoint carte : toutes les vias avec coordonnées GPS
     if ($r1 === 'map' && $method === 'GET') {
-        $rows = $db->fetchAll(
-            "SELECT v.id, v.name, v.slug, v.latitude, v.longitude, v.difficulty, v.image_url,
-                    d.name as department_name, vrs.avg_overall
-             FROM vias v
-             LEFT JOIN departments d ON v.department_id = d.code
-             LEFT JOIN via_ratings_summary vrs ON v.id = vrs.via_id
-             WHERE v.is_active = 1 AND v.is_approved = 1
-               AND v.latitude IS NOT NULL AND v.longitude IS NOT NULL
-               AND v.latitude != 0 AND v.longitude != 0
-             ORDER BY v.name ASC"
-        );
-        foreach ($rows as &$r) {
-            $r['latitude']  = (float)$r['latitude'];
-            $r['longitude'] = (float)$r['longitude'];
-            if (!empty($r['image_url'])) $r['image_url'] = normalizeUrl($r['image_url']);
+        try {
+            $rows = $db->fetchAll(
+                "SELECT v.id, v.name, v.slug, v.latitude, v.longitude, v.difficulty, v.code_pays as country,
+                        v.image_url, d.name as department_name, vrs.avg_overall
+                 FROM vias v
+                 LEFT JOIN departments d ON v.department_id = d.code
+                 LEFT JOIN via_ratings_summary vrs ON v.id = vrs.via_id
+                 WHERE v.is_active = 1
+                   AND v.latitude IS NOT NULL AND v.longitude IS NOT NULL
+                   AND v.latitude != 0 AND v.longitude != 0
+                 ORDER BY v.name ASC"
+            );
+        } catch (Throwable $e) {
+            try {
+                $rows = $db->fetchAll(
+                    "SELECT v.id, v.name, v.slug, v.latitude, v.longitude, v.difficulty, v.code_pays as country,
+                            v.image_url, d.name as department_name, NULL as avg_overall
+                     FROM vias v
+                     LEFT JOIN departments d ON v.department_id = d.code
+                     WHERE v.is_active = 1
+                       AND v.latitude IS NOT NULL AND v.longitude IS NOT NULL
+                       AND v.latitude != 0 AND v.longitude != 0
+                     ORDER BY v.name ASC"
+                );
+            } catch (Throwable $e2) {
+                $rows = [];
+            }
         }
-        mok($rows);
+        $points = [];
+        foreach ($rows as $r) {
+            $points[] = [
+                'id'              => (int)$r['id'],
+                'slug'            => $r['slug'],
+                'name'            => $r['name'],
+                'gps_lat'         => (float)$r['latitude'],
+                'gps_lng'         => (float)$r['longitude'],
+                'difficulty'      => $r['difficulty'] !== null ? (int)$r['difficulty'] : null,
+                'country'         => $r['country'] ?? null,
+                'department_name' => $r['department_name'] ?? null,
+                'avg_overall'     => $r['avg_overall'] !== null ? round((float)$r['avg_overall'], 1) : null,
+                'image_url'       => !empty($r['image_url']) ? normalizeUrl($r['image_url']) : null,
+            ];
+        }
+        mok($points);
     }
 
     if ($r1 === '' && $method === 'GET') {
-        $page  = max(1, (int)($_GET['page'] ?? 1));
-        $limit = min(50, max(1, (int)($_GET['limit'] ?? 20)));
+        $page   = max(1, (int)($_GET['page'] ?? 1));
+        $limit  = min(50, max(1, (int)($_GET['limit'] ?? 20)));
         $offset = ($page - 1) * $limit;
         $filters = [];
-        if (!empty($_GET['search']))          $filters['search']         = $_GET['search'];
-        if (!empty($_GET['department_code'])) $filters['department_code']= $_GET['department_code'];
-        if (!empty($_GET['country']))         $filters['country']        = $_GET['country'];
-        if (isset($_GET['difficulty_min']))   $filters['difficulty_min'] = (int)$_GET['difficulty_min'];
-        if (isset($_GET['difficulty_max']))   $filters['difficulty_max'] = (int)$_GET['difficulty_max'];
-        if (!empty($_GET['order_by']))        $filters['order_by']       = $_GET['order_by'];
+        if (!empty($_GET['search']))          $filters['search']          = $_GET['search'];
+        if (!empty($_GET['department_code'])) $filters['department_code'] = $_GET['department_code'];
+        if (!empty($_GET['country']))         $filters['country']         = $_GET['country'];
+        if (!empty($_GET['difficulty_min']))  $filters['difficulty_min']  = (int)$_GET['difficulty_min'];
+        if (!empty($_GET['difficulty_max']))  $filters['difficulty_max']  = (int)$_GET['difficulty_max'];
+        if (!empty($_GET['order_by']))        $filters['order_by']        = $_GET['order_by'];
 
-        $total = $viaModel->count($filters);
-        $items = $viaModel->search($filters, $limit, $offset);
-        foreach ($items as &$item) {
-            if (!empty($item['image_url'])) $item['image_url'] = normalizeUrl($item['image_url']);
+        try {
+            $total = $viaModel->count($filters);
+        } catch (Throwable $e) {
+            $total = 0;
         }
-        mok(['items' => $items, 'total' => $total, 'page' => $page, 'limit' => $limit]);
+        try {
+            $items = $viaModel->search($filters, $limit, $offset);
+            mok(['items' => array_map('normalizeVia', $items), 'total' => $total, 'page' => $page, 'limit' => $limit]);
+        } catch (Throwable $e) {
+            // Fallback: simple query without via_ratings_summary view
+            try {
+                $simpleConditions = ["v.is_active = 1"];
+                $simpleParams = [];
+                if (!empty($filters['search'])) {
+                    $s = '%' . $filters['search'] . '%';
+                    $simpleConditions[] = "(v.name LIKE :s_name OR v.location LIKE :s_loc)";
+                    $simpleParams[':s_name'] = $s;
+                    $simpleParams[':s_loc']  = $s;
+                }
+                if (!empty($filters['country'])) {
+                    $simpleConditions[] = "v.code_pays = :country";
+                    $simpleParams[':country'] = $filters['country'];
+                }
+                if (isset($filters['difficulty_min'])) { $simpleConditions[] = "v.difficulty >= :dmin"; $simpleParams[':dmin'] = $filters['difficulty_min']; }
+                if (isset($filters['difficulty_max'])) { $simpleConditions[] = "v.difficulty <= :dmax"; $simpleParams[':dmax'] = $filters['difficulty_max']; }
+                $where = implode(' AND ', $simpleConditions);
+                $stmt = $db->getConnection()->prepare(
+                    "SELECT v.*, d.name as department_name, d.code as department_code
+                     FROM vias v
+                     LEFT JOIN departments d ON v.department_id = d.code
+                     WHERE $where ORDER BY v.created_at DESC LIMIT :limit OFFSET :offset"
+                );
+                foreach ($simpleParams as $k => $val) { $stmt->bindValue($k, $val); }
+                $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+                $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+                $stmt->execute();
+                $items = $stmt->fetchAll();
+                if ($total === 0) $total = count($items);
+                mok(['items' => array_map('normalizeVia', $items), 'total' => $total, 'page' => $page, 'limit' => $limit]);
+            } catch (Throwable $e2) {
+                mok(['items' => [], 'total' => 0, 'page' => $page, 'limit' => $limit]);
+            }
+        }
     }
 
     if ($r1 !== '' && $r2 === '' && $method === 'GET') {
@@ -172,21 +298,27 @@ if ($r0 === 'vias') {
         $via = $viaModel->getBySlug($r1);
         if (!$via) merr('Via ferrata introuvable', 404);
 
-        $ratingModel  = new Rating();
-        $commentModel = new Comment();
-        $photoModel   = new Photo();
+        $data = normalizeVia($via);
 
-        $via['ratings']  = $ratingModel->getByVia($via['id']);
-        $via['comments'] = $commentModel->getByVia($via['id']);
-        $photos = $photoModel->getApprovedByVia($via['id']);
-        foreach ($photos as &$p) {
-            if (!empty($p['file_path'])) $p['file_path'] = normalizeUrl($p['file_path']);
+        try {
+            $ratingModel  = new Rating();
+            $commentModel = new Comment();
+            $photoModel   = new Photo();
+            $data['ratings']  = $ratingModel->getByVia($via['id']);
+            $data['comments'] = $commentModel->getByVia($via['id']);
+            $photos = $photoModel->getApprovedByVia($via['id']);
+            foreach ($photos as &$p) {
+                $fileUrl = !empty($p['file_path']) ? normalizeUrl($p['file_path']) : null;
+                $p['url']       = $fileUrl;
+                $p['file_path'] = $fileUrl;
+            }
+            $data['photos'] = $photos;
+        } catch (Throwable $e) {
+            $data['ratings']  = [];
+            $data['comments'] = [];
+            $data['photos']   = [];
         }
-        $via['photos']   = $photos;
-        if (!empty($via['image_url'])) $via['image_url'] = normalizeUrl($via['image_url']);
-        if (!empty($via['latitude']))  $via['latitude']  = (float)$via['latitude'];
-        if (!empty($via['longitude'])) $via['longitude'] = (float)$via['longitude'];
-        mok($via);
+        mok($data);
     }
 
     if ($r1 !== '' && $r2 === 'rate' && $method === 'POST') {
@@ -195,6 +327,11 @@ if ($r0 === 'vias') {
         $jwt = JWT::fromRequest();
         $userId = $jwt ? (int)$jwt['sub'] : null;
         $b = body();
+        if (!$jwt && !empty(TURNSTILE_SECRET_KEY)) {
+            if (!verifyCloudflareTurnstile($b['turnstile_token'] ?? null)) {
+                merr('Vérification anti-spam échouée.', 422);
+            }
+        }
         $rG = (float)($b['rating_general'] ?? 0);
         $rB = (float)($b['rating_beauty'] ?? 0);
         $rD = (float)($b['rating_difficulty'] ?? 0);
@@ -211,6 +348,12 @@ if ($r0 === 'vias') {
         $jwt = JWT::fromRequest();
         $userId = $jwt ? (int)$jwt['sub'] : null;
         $b = body();
+        // Turnstile required for anonymous users when configured
+        if (!$jwt && !empty(TURNSTILE_SECRET_KEY)) {
+            if (!verifyCloudflareTurnstile($b['turnstile_token'] ?? null)) {
+                merr('Vérification anti-spam échouée. Rechargez la page.', 422);
+            }
+        }
         $content = trim($b['content'] ?? '');
         $author  = $jwt ? $jwt['username'] : trim($b['author_name'] ?? '');
         if (strlen($content) < 10 || !$author) merr('Contenu insuffisant');
@@ -218,6 +361,26 @@ if ($r0 === 'vias') {
         $ok = (new Comment())->create($via['id'], $author, $content, $userId, $hash, null, $_SERVER['REMOTE_ADDR'] ?? null);
         if (!$ok) merr('Erreur lors de la publication');
         mok(['published' => true]);
+    }
+
+    if ($r1 !== '' && $r2 === 'photos' && $method === 'POST') {
+        $via = $viaModel->getBySlug($r1);
+        if (!$via) merr('Via introuvable', 404);
+        if (!isset($_FILES['photo'])) merr('Fichier photo manquant');
+        $jwt = JWT::fromRequest();
+        if (!$jwt && !empty(TURNSTILE_SECRET_KEY)) {
+            if (!verifyCloudflareTurnstile($_POST['turnstile_token'] ?? null)) {
+                merr('Vérification anti-spam échouée.', 422);
+            }
+        }
+        $userId = $jwt ? (int)$jwt['sub'] : null;
+        $authorName = $jwt ? ($jwt['username'] ?? 'Utilisateur') : trim($_POST['author_name'] ?? 'Anonyme');
+        $visitorHash = hash('sha256', ($_SERVER['REMOTE_ADDR'] ?? '') . ($jwt ? $jwt['sub'] : 'anon'));
+        $result = (new Photo())->upload($via['id'], $_FILES['photo'], $userId, $authorName, $visitorHash, $_SERVER['REMOTE_ADDR'] ?? null);
+        if (!is_int($result) || $result <= 0) {
+            merr('Erreur lors de l\'upload photo: ' . (is_string($result) ? $result : 'unknown'));
+        }
+        mok(['photo_id' => $result, 'pending_review' => true], 201);
     }
 
     merr('Endpoint inconnu', 404);
@@ -233,7 +396,25 @@ if ($r0 === 'favorites') {
 
     if ($method === 'GET') {
         $status = $_GET['status'] ?? null;
-        mok($favModel->getByUser($uid, $status ?: null));
+        $rows = $favModel->getByUser($uid, $status ?: null);
+        $formatted = array_map(function($f) {
+            return [
+                'id'         => (int)($f['fav_id'] ?? $f['via_id'] ?? 0),
+                'via_id'     => (int)($f['via_id'] ?? 0),
+                'status'     => $f['status'] ?? 'to_do',
+                'created_at' => $f['fav_created_at'] ?? $f['fav_updated_at'] ?? '',
+                'via' => [
+                    'id'         => (int)($f['via_id'] ?? 0),
+                    'name'       => $f['name'] ?? ('Via #' . ($f['via_id'] ?? '?')),
+                    'slug'       => $f['slug'] ?? '',
+                    'location'   => $f['location'] ?? null,
+                    'country'    => $f['code_pays'] ?? null,
+                    'difficulty' => isset($f['difficulty']) && $f['difficulty'] !== null ? (int)$f['difficulty'] : null,
+                    'image_url'  => !empty($f['image_url']) ? normalizeUrl($f['image_url']) : null,
+                ],
+            ];
+        }, $rows);
+        mok($formatted);
     }
 
     if ($method === 'POST') {
@@ -374,21 +555,107 @@ if ($r0 === 'dashboard') {
     $favModel  = new Favorite();
     $logModel  = new Logbook();
     $tripModel = new RoadTrip();
-    $viaModel  = new ViaFerrata();
+
+    // Flatten favorites rows → nested {via: {name, slug}} for app
+    $recentFavs = $favModel->getByUser($uid, null);
+    $recentFavsFormatted = array_map(function($f) {
+        return [
+            'id'         => (int)($f['fav_id'] ?? $f['via_id'] ?? 0),
+            'via_id'     => (int)($f['via_id'] ?? 0),
+            'status'     => $f['status'] ?? 'to_do',
+            'created_at' => $f['fav_created_at'] ?? $f['fav_updated_at'] ?? '',
+            'via' => [
+                'id'   => (int)($f['via_id'] ?? 0),
+                'name' => $f['name'] ?? ('Via #' . ($f['via_id'] ?? '?')),
+                'slug' => $f['slug'] ?? '',
+            ],
+        ];
+    }, array_slice($recentFavs, 0, 50));
+
+    // Flatten logbook rows → nested {via: {name, slug}} for app
+    $recentLog = $logModel->getByUser($uid);
+    $recentLogFormatted = array_map(function($l) {
+        return [
+            'id'         => (int)($l['id'] ?? 0),
+            'via_id'     => (int)($l['via_id'] ?? 0),
+            'done_date'  => $l['done_date'] ?? '',
+            'conditions' => $l['conditions'] ?? null,
+            'companion'  => $l['companion'] ?? null,
+            'notes'      => $l['notes'] ?? null,
+            'via' => [
+                'id'   => (int)($l['via_id'] ?? 0),
+                'name' => $l['via_name'] ?? $l['name'] ?? ('Via #' . ($l['via_id'] ?? '?')),
+                'slug' => $l['via_slug'] ?? $l['slug'] ?? '',
+            ],
+        ];
+    }, array_slice($recentLog, 0, 5));
 
     mok([
         'stats' => [
-            'favorites_count'  => $favModel->countByUser($uid),
-            'to_do_count'      => $favModel->countByUser($uid, 'to_do'),
-            'done_count'       => $favModel->countByUser($uid, 'done'),
-            'logbook_count'    => $logModel->countByUser($uid),
-            'logbook_this_year'=> $logModel->countThisYear($uid),
-            'trips_count'      => count($tripModel->getByUser($uid)),
+            'favorites_count'   => $favModel->countByUser($uid),
+            'to_do_count'       => $favModel->countByUser($uid, 'to_do'),
+            'done_count'        => $favModel->countByUser($uid, 'done'),
+            'logbook_count'     => $logModel->countByUser($uid),
+            'logbook_this_year' => $logModel->countThisYear($uid),
+            'trips_count'       => count($tripModel->getByUser($uid)),
         ],
-        'recent_favorites' => $favModel->getByUser($uid, null),
-        'recent_logbook'   => $logModel->getByUser($uid),
+        'recent_favorites' => $recentFavsFormatted,
+        'recent_logbook'   => $recentLogFormatted,
         'trips'            => $tripModel->getByUser($uid),
     ]);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SUBMIT  (public — via proposal)
+// ═══════════════════════════════════════════════════════════════════
+if ($r0 === 'submit' && $method === 'POST') {
+    try {
+        $b = body();
+        $jwtSubmit = JWT::fromRequest();
+        if (!$jwtSubmit && !empty(TURNSTILE_SECRET_KEY) && !verifyCloudflareTurnstile($b['turnstile_token'] ?? null)) {
+            merr('Vérification anti-spam échouée. Complétez le captcha.', 422);
+        }
+        $name     = trim($b['name'] ?? '');
+        $location = trim($b['location'] ?? '');
+        if (!$name || !$location) merr('Nom et localisation requis');
+
+        $viaModel = new ViaFerrata();
+
+        // Generate unique slug
+        $slug = $viaModel->generateSlug($name);
+        $db   = Database::getInstance();
+        $base = $slug; $i = 1;
+        while ($db->fetchOne("SELECT id FROM vias WHERE slug = :s", [':s' => $slug])) {
+            $slug = $base . '-' . $i++;
+        }
+
+        $db->insert(
+            "INSERT INTO vias (name, slug, location, latitude, longitude, difficulty,
+                               duration_hours, approach_time, return_time, elevation_gain,
+                               description, submitted_by, is_active, is_approved,
+                               created_at, updated_at)
+             VALUES (:name, :slug, :location, :lat, :lng, :diff, :dur, :app, :ret, :elev,
+                     :desc, :submitted_by, 0, 0, NOW(), NOW())",
+            [
+                ':name'         => $name,
+                ':slug'         => $slug,
+                ':location'     => $location,
+                ':lat'          => isset($b['latitude'])       ? (float)$b['latitude']       : null,
+                ':lng'          => isset($b['longitude'])      ? (float)$b['longitude']      : null,
+                ':diff'         => isset($b['difficulty'])     ? (int)$b['difficulty']       : null,
+                ':dur'          => isset($b['duration_hours']) ? (float)$b['duration_hours'] : null,
+                ':app'          => isset($b['approach_time'])  ? (int)$b['approach_time']    : null,
+                ':ret'          => isset($b['return_time'])    ? (int)$b['return_time']      : null,
+                ':elev'         => isset($b['elevation_gain']) ? (int)$b['elevation_gain']   : null,
+                ':desc'         => trim($b['description'] ?? '') ?: null,
+                ':submitted_by' => $jwtSubmit ? (int)$jwtSubmit['sub'] : null,
+            ]
+        );
+        mok(['submitted' => true], 201);
+    } catch (Throwable $e) {
+        error_log('[submit via] ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+        merr('Erreur: ' . $e->getMessage(), 500);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -396,9 +663,20 @@ if ($r0 === 'dashboard') {
 // ═══════════════════════════════════════════════════════════════════
 if ($r0 === 'stats') {
     $db = Database::getInstance();
-    $total = (int)$db->fetchOne("SELECT COUNT(*) AS c FROM vias WHERE is_active=1 AND is_approved=1")['c'];
-    $countries = $db->fetchAll("SELECT country, COUNT(*) AS count FROM vias WHERE is_active=1 AND is_approved=1 AND country IS NOT NULL GROUP BY country ORDER BY count DESC") ?: [];
-    mok(['total_vias' => $total, 'countries' => $countries]);
+    $total     = (int)($db->fetchOne("SELECT COUNT(*) AS c FROM vias WHERE is_active=1")['c'] ?? 0);
+    $countries = $db->fetchAll("SELECT code_pays as country, COUNT(*) AS count FROM vias WHERE is_active=1 AND code_pays IS NOT NULL AND code_pays != '' GROUP BY code_pays ORDER BY count DESC") ?: [];
+    mok(['total_vias' => $total, 'countries' => count($countries)]);
 }
+
+// ── API root ─────────────────────────────────────────────────────────────────
+if ($r0 === '') {
+    mok([
+        'api'      => 'ViaFerrata-Monde Mobile API',
+        'version'  => '1.1',
+        'base_url' => '/mobile-api',
+    ]);
+}
+
+merr('Route non trouvée : ' . $method . ' /' . $r0, 404);
 
 merr('Endpoint inconnu', 404);

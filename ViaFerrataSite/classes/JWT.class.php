@@ -34,7 +34,13 @@ class JWT {
     }
 
     public static function fromRequest(): array|false {
-        $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        $auth = $_SERVER['HTTP_AUTHORIZATION']
+             ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+             ?? '';
+        if (empty($auth) && function_exists('getallheaders')) {
+            $all  = getallheaders();
+            $auth = $all['Authorization'] ?? $all['authorization'] ?? '';
+        }
         if (!preg_match('/^Bearer\s+(.+)$/i', $auth, $m)) return false;
         return self::verify($m[1]);
     }
