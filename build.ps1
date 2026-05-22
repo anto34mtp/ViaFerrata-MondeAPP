@@ -33,6 +33,21 @@ $ScriptDir    = Split-Path -Parent $MyInvocation.MyCommand.Path
 $AppDir       = Join-Path $ScriptDir "ViaFerrataApp"
 $AndroidDir   = Join-Path $AppDir "android"
 $KeystoreDir  = Join-Path $ScriptDir "keystore"
+
+# ── Redirection des caches vers D: ──────────────────────────────────────────
+# Gradle cache peut depasser 10 Go ; npm cache plusieurs Go.
+# Si D: existe, on redirige pour liberer C:.
+Write-Step "Espace disque et caches"
+if (Test-Path "D:\") {
+    $env:GRADLE_USER_HOME = "D:\GradleCache"
+    $env:NPM_CONFIG_CACHE = "D:\NpmCache"
+    New-Item -ItemType Directory -Path $env:GRADLE_USER_HOME -Force | Out-Null
+    New-Item -ItemType Directory -Path $env:NPM_CONFIG_CACHE -Force | Out-Null
+    Write-OK "Cache Gradle → $($env:GRADLE_USER_HOME)"
+    Write-OK "Cache npm    → $($env:NPM_CONFIG_CACHE)"
+} else {
+    Write-Info "Disque D non disponible -- caches sur C: par defaut."
+}
 $KeystoreFile = Join-Path $KeystoreDir "viaferrata.keystore"
 $KeystoreProps= Join-Path $KeystoreDir "keystore.properties"
 $OutputDir    = Join-Path $ScriptDir "build_output"
