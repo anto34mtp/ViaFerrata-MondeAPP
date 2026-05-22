@@ -237,20 +237,16 @@ if ($NeedsReinstall) {
     if (Test-Path "package-lock.json") { Remove-Item -Force "package-lock.json" }
 }
 
-# react-native-screens 3.31+ necessite react-native-builder-bob pour son script prepare
-if (-not (Test-Command "bob")) {
-    Write-Info "Installation globale de react-native-builder-bob (requis par react-native-screens)..."
-    & npm.cmd install -g react-native-builder-bob
-    Refresh-Path
-}
-
+# --ignore-scripts evite le prepare de react-native-screens 3.31+ (bob build)
+# qui n'est necessaire que pour le dev TypeScript, pas pour le build Android.
+# Le postinstall (patch-rngp.js) est relance manuellement apres.
 if (-not (Test-Path "node_modules")) {
     Write-Info "Installation des dependances..."
-    & npm.cmd install --legacy-peer-deps
+    & npm.cmd install --legacy-peer-deps --ignore-scripts
     if ($LASTEXITCODE -ne 0) { Write-Fail "npm install a echoue." }
 } else {
     Write-Info "node_modules present. Mise a jour..."
-    & npm.cmd install --legacy-peer-deps --prefer-offline
+    & npm.cmd install --legacy-peer-deps --ignore-scripts --prefer-offline
 }
 Write-OK "Dependances npm OK."
 
